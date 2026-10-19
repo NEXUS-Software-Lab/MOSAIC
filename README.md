@@ -1,6 +1,6 @@
 # MOSAIC
 
-**Android structural quality metrics from APKs.**
+**Android structural metrics from APKs.**
 
 [![NEXUS Software Lab](https://img.shields.io/badge/NEXUS-Software_Lab-243b53?style=flat-square)](https://nexus-software-lab.github.io/)
 [![GitHub organization](https://img.shields.io/badge/GitHub-NEXUS--Software--Lab-181717?logo=github&style=flat-square)](https://github.com/NEXUS-Software-Lab)
