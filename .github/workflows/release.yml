@@ -72,7 +72,7 @@ jobs:
             ${{ steps.release.outputs.image }}:latest
           labels: |
             org.opencontainers.image.title=MOSAIC
-            org.opencontainers.image.description=Android structural quality metrics from APKs
+            org.opencontainers.image.description=Android structural metrics from APKs
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
