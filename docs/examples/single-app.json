@@ -1,0 +1,60 @@
+{
+  "apk_path": "illustrative-notes.apk",
+  "apk_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "package": "org.example.notes",
+  "version_code": "1",
+  "analysis_scope": "artifact",
+  "sdk": {
+    "min": "23",
+    "target": "35"
+  },
+  "metrics": {
+    "CD": 0.05,
+    "LL": 2.5,
+    "IC": 2.0,
+    "UE": 4.5,
+    "AB": 0.04,
+    "PD": 0.02,
+    "FC": 0.45
+  },
+  "counts": {
+    "classes_analyzed_total": 240,
+    "components_total_for_cd_ll": 12,
+    "manifest_components": 8,
+    "activity_aliases": 0,
+    "fragment_classes": 4,
+    "icc_components_for_ic": 8,
+    "lifecycle_callbacks": 30,
+    "icc_callsites": 16,
+    "ui_classes": 10,
+    "ui_nonui_callsites": 45,
+    "async_callsites": 160,
+    "resource_callsites": 80,
+    "callsites_total": 4000,
+    "callsites_framework_android_androidx": 1800
+  },
+  "provenance": {
+    "mosaic_version": "0.4.0",
+    "androguard_version": "illustrative; no APK analyzed",
+    "taxonomy_version": "illustrative",
+    "run_timestamp": "illustrative; no analysis run",
+    "analysis_scope": "artifact",
+    "scope_definition": "all DEX-defined classes",
+    "callsite_definition": "Dalvik invoke instructions in analyzed methods",
+    "framework_definition": "target class starts with Landroid/ or Landroidx/"
+  },
+  "evidence": {
+    "manifest_components": [
+      {
+        "name": "org.example.notes.MainActivity",
+        "dalvik_name": "Lorg/example/notes/MainActivity;",
+        "type": "activity"
+      }
+    ],
+    "activity_aliases": [],
+    "fragment_classes": [],
+    "ui_classes": [
+      "Lorg/example/notes/MainActivity;"
+    ]
+  }
+}

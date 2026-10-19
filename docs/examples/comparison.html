@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOSAIC Analysis Report</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        details > summary::-webkit-details-marker { display: none; }
+        .evidence-item { white-space: normal; overflow-wrap: anywhere; word-break: normal; }
+        .evidence-item.expandable { cursor: pointer; }
+        .evidence-item.expandable:hover { color: #4f46e5; background: #eef2ff; border-radius: 4px; }
+        .evidence-item.truncated {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            display: block;
+        }
+        .dataset-toggle { transition: all 0.2s; }
+        .dataset-toggle { min-width: 0; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+        .comparison-controls { min-width: 0; }
+        .comparison-controls > span { flex-shrink: 0; padding-top: 8px; }
+        #chart-toggles { min-width: 0; }
+        .comparison-grid > div { min-width: 0; }
+        .comparison-scroll { overflow-x: auto; }
+        .comparison-scroll:focus-visible { outline: 2px solid #6366f1; outline-offset: 4px; }
+        .comparison-large .comparison-heading { flex-direction: column; align-items: stretch; }
+        .comparison-large .comparison-controls { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+        .comparison-large #chart-toggles { max-height: 180px; overflow-y: auto; padding: 2px; }
+        .comparison-grid { grid-template-columns: minmax(0, 1fr); align-items: start; }
+        .comparison-profile { display: flex; flex-direction: column; }
+        .comparison-profile .radar-container { flex-shrink: 0; margin-block: auto; }
+        @media (min-width: 1100px) {
+            .comparison-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); align-items: stretch; }
+        }
+        .radar-container { max-width: 720px; margin-inline: auto; }
+        .input-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; }
+        .input-tab { padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; color: #475569; font-size: 14px; font-weight: 600; }
+        .input-tab:hover { background: #f8fafc; }
+        .input-tab[aria-selected="true"] { color: #4338ca; border-color: #818cf8; background: #eef2ff; }
+        .input-chart-card { min-width: 0; padding: 12px 0; }
+        .input-chart-card + .input-chart-card { border-top: 1px solid #e2e8f0; margin-top: 16px; padding-top: 24px; }
+        .input-chart-heading { margin: 0 12px 12px; font-size: 14px; font-weight: 600; color: #334155; }
+        .input-tab-panel[hidden], #input-charts-grid[hidden] { display: none; }
+        .dataset-toggle.disabled {
+            opacity: 0.4;
+            filter: grayscale(100%);
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #64748b;
+        }
+        .metric-row:hover .metric-formula { opacity: 1; }
+        .metric-help { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; vertical-align: middle; color: #64748b; cursor: help; border-radius: 6px; flex-shrink: 0; }
+        .metric-help span { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border: 1px solid currentColor; border-radius: 50%; font: 600 10px/1 Georgia, serif; }
+        .metric-help:focus-visible { outline: 2px solid #c7d2fe; outline-offset: 2px; }
+        #metric-popover { position: fixed; z-index: 100; display: flex; flex-direction: column; width: 360px; max-width: calc(100vw - 24px); max-height: min(480px, calc(100vh - 24px)); overflow: hidden; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px #0f172a26; color: #334155; font-size: 13px; line-height: 1.5; }
+        #metric-popover[hidden] { display: none; }
+        #metric-popover h3 { flex-shrink: 0; font-weight: 600; color: #0f172a; padding: 14px 42px 12px 18px; border-bottom: 1px solid #e2e8f0; }
+        #metric-help-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; padding: 14px 18px 18px; }
+        #metric-help-body:focus-visible { outline: 2px solid #c7d2fe; outline-offset: -3px; }
+        #metric-popover p + p { margin-top: 10px; }
+        #metric-help-formula { font-family: monospace; color: #4f46e5; }
+        .metric-calculation { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+        .metric-calculation h4 { font-weight: 600; color: #0f172a; overflow-wrap: anywhere; margin-bottom: 8px; }
+        .metric-calculation dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+        .metric-calculation dd { font-family: monospace; text-align: right; }
+        .metric-calculation-result { margin-top: 8px; font-family: monospace; color: #4f46e5; overflow-wrap: anywhere; }
+        #metric-help-close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 6px; }
+        #metric-help-close:hover { background: #f1f5f9; }
+        #single-metric-labels { position: absolute; inset: 0; pointer-events: none; }
+        .single-metric-label { position: absolute; left: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: 11px; line-height: 1.3; text-align: right; color: #475569; }
+        .single-metric-label .metric-help { pointer-events: auto; }
+        .single-metric-value { position: absolute; transform: translateY(-50%); white-space: nowrap; font: 11px/1.3 ui-monospace, monospace; color: #475569; }
+        .radar-metric-labels { position: absolute; inset: 0; pointer-events: none; }
+        .radar-metric-label { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; white-space: nowrap; font-size: 12px; font-weight: 600; color: #475569; }
+        .radar-metric-label .metric-help { pointer-events: auto; }
+        @media print { #metric-popover { display: none; } }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: #fff !important; }
+            .shadow-sm { box-shadow: none !important; }
+            .print-break { break-before: page; }
+        }
+
+        .help-guidance { font-size: 12px; line-height: 1.5; color: #64748b; }
+        .notation-label { display: inline-block; margin-left: 6px; font: 400 11px/1.5 ui-monospace, monospace; color: #64748b; vertical-align: baseline; }
+        .font-mono, td, dd { font-variant-numeric: tabular-nums; }
+        article h3, article p, td:first-child, .metric-row .min-w-0 { overflow-wrap: anywhere; }
+        td:first-child { white-space: normal; min-width: 180px; }
+        .metric-row .min-w-0 > .flex { flex-wrap: wrap; }
+        .metadata-summary { display: inline-flex; align-items: center; gap: 12px; padding: 6px 0; cursor: pointer; font-weight: 500; color: #475569; }
+        .disclosure-arrow { width: 16px; height: 16px; flex-shrink: 0; transition: transform .2s; }
+        details[open] > summary .disclosure-arrow { transform: rotate(180deg); }
+        button:focus-visible, summary:focus-visible, canvas:focus-visible, .evidence-item:focus-visible { outline: 2px solid #6366f1; outline-offset: 3px; }
+        #chart-value-popover { position: fixed; z-index: 90; width: 360px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); overflow: auto; background: white; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 12px 32px #0f172a26; color: #334155; font-size: 13px; line-height: 1.5; pointer-events: none; }
+        #chart-value-popover.pinned { pointer-events: auto; }
+        #chart-value-popover h3 { padding: 14px 42px 12px 18px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0f172a; }
+        #chart-value-popover button { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 6px; }
+        #chart-value-popover button:hover { background: #f1f5f9; }
+        .chart-value-rows { padding: 12px 18px; display: grid; gap: 10px; }
+        .chart-value-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; }
+        .chart-value-name { overflow-wrap: anywhere; }
+        .chart-value-number { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; color: #4338ca; }
+        .chart-value-swatch { width: 8px; height: 8px; border-radius: 50%; }
+        .chart-empty { z-index: 2; position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #64748b; font-size: 13px; background: #fff; }
+        .chart-empty[hidden] { display: none; }
+        @media print { #chart-value-popover, .help-guidance { display: none !important; } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen pb-12">
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+
+    <!-- ================================================================ -->
+    <!-- HEADER                                                           -->
+    <!-- ================================================================ -->
+    <header class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">MOSAIC Analysis Report</h1>
+            </div>
+
+            <p class="text-sm text-slate-500 mt-2 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>Generated illustrative; no analysis run</span>
+                <span class="text-slate-300">|</span>
+                <span>MOSAIC v0.4.0</span>
+            </p>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            <div class="bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 text-center min-w-20">
+                <div class="text-[10px] font-bold text-slate-500 uppercase">Total</div>
+                <div class="text-xl font-bold text-slate-800">2</div>
+            </div>
+            <div class="bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100 text-center min-w-20">
+                <div class="text-[10px] font-bold text-emerald-600 uppercase">Success</div>
+                <div class="text-xl font-bold text-emerald-700">2</div>
+            </div>
+            <div class="bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 text-center min-w-20">
+                <div class="text-[10px] font-bold text-slate-500 uppercase">Failed</div>
+                <div class="text-xl font-bold text-slate-700">0</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================================================================ -->
+    <!-- SINGLE-APP OVERVIEW                                               -->
+    <!-- ================================================================ -->
+
+    <!-- ================================================================ -->
+    <!-- MULTI-APP COMPARISON DASHBOARD                                   -->
+    <!-- ================================================================ -->
+    <section id="application-comparison" class="space-y-6">
+        <div class="comparison-heading flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-bold text-slate-800">Application Comparison</h2>
+                <p class="text-sm text-slate-500 mt-1">Compare MOSAIC metric profiles across successfully analyzed applications.</p>
+                    <p class="help-guidance mt-2">Hover or tap ⓘ for definitions and calculations.</p>
+            </div>
+            <div class="comparison-controls flex items-start gap-2 text-sm no-print">
+                <span id="chart-toggles-label" class="text-slate-500 font-medium text-xs uppercase tracking-wider">Show in Charts:</span>
+                <div id="chart-toggles" class="flex flex-wrap gap-2" role="group" aria-labelledby="chart-toggles-label"></div>
+            </div>
+        </div>
+
+        <div class="comparison-grid grid gap-6">
+            <!-- Relative profile -->
+            <div class="comparison-profile bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider text-center mb-4">Structural Metric Profile</h3>
+                <div class="radar-container relative w-full h-[350px]">
+                    <p id="radar-empty" class="chart-empty" hidden>No applications selected. Select an application above.</p>
+                    <canvas id="global-radar-chart" role="img" aria-label="Relative metric profiles; exact values are in the Metric Summary table."></canvas>
+                    <div id="radar-metric-labels" class="radar-metric-labels" aria-label="Spider chart metric definitions">
+<span class="radar-metric-label" data-axis="0">CD <button type="button" class="metric-help" data-metric="CD" aria-label="About CD: Component Density" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></span><span class="radar-metric-label" data-axis="1">LL <button type="button" class="metric-help" data-metric="LL" aria-label="About LL: Lifecycle Load" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></span><span class="radar-metric-label" data-axis="2">IC <button type="button" class="metric-help" data-metric="IC" aria-label="About IC: ICC Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></span><span class="radar-metric-label" data-axis="3">UE <button type="button" class="metric-help" data-metric="UE" aria-label="About UE: UI Entanglement" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></span><span class="radar-metric-label" data-axis="4">AB <button type="button" class="metric-help" data-metric="AB" aria-label="About AB: Async Burden" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></span><span class="radar-metric-label" data-axis="5">PD <button type="button" class="metric-help" data-metric="PD" aria-label="About PD: Platform Dependence" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></span><span class="radar-metric-label" data-axis="6">FC <button type="button" class="metric-help" data-metric="FC" aria-label="About FC: Framework Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></span>                    </div>
+                </div>
+            </div>
+
+            <!-- Inputs -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider text-center mb-4">Metric Inputs</h3>
+                <div class="input-tabs" role="tablist" aria-label="Metric input groups">
+                    <button type="button" id="input-tab-structure" class="input-tab" role="tab" aria-controls="input-panel-structure" aria-selected="true" tabindex="0" data-input-group="structure">Structure &amp; Lifecycle</button>
+                    <button type="button" id="input-tab-communication" class="input-tab" role="tab" aria-controls="input-panel-communication" aria-selected="false" tabindex="-1" data-input-group="communication">Communication &amp; UI</button>
+                    <button type="button" id="input-tab-platform" class="input-tab" role="tab" aria-controls="input-panel-platform" aria-selected="false" tabindex="-1" data-input-group="platform">Callsites &amp; Platform</button>
+                </div>
+                <div id="comparison-input-legend" class="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs mb-4" aria-label="Applications shown in the input charts"></div>
+                <p id="inputs-empty" class="text-sm text-slate-500 text-center py-8" hidden>No applications selected. Select an application above.</p>
+                <div id="input-charts-grid">
+                    <div id="input-panel-structure" class="input-tab-panel" role="tabpanel" aria-labelledby="input-tab-structure">
+                        <section class="input-chart-card" aria-labelledby="input-heading-structure-metrics">
+                            <h4 id="input-heading-structure-metrics" class="sr-only">Metric inputs</h4>
+                            <div class="comparison-scroll" tabindex="0" role="region" aria-labelledby="input-heading-structure-metrics">
+                                <div id="input-container-structure-metrics" class="relative w-full" style="min-width: 480px; height: 350px">
+                                    <canvas id="input-chart-structure-metrics" role="img" aria-label="Structure &amp; Lifecycle — Metric inputs: input counts by application"></canvas>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="input-chart-card" aria-labelledby="input-heading-component-breakdown">
+                            <h4 id="input-heading-component-breakdown" class="input-chart-heading">Component breakdown</h4>
+                            <div class="comparison-scroll" tabindex="0" role="region" aria-labelledby="input-heading-component-breakdown">
+                                <div id="input-container-component-breakdown" class="relative w-full" style="min-width: 480px; height: 350px">
+                                    <canvas id="input-chart-component-breakdown" role="img" aria-label="Structure &amp; Lifecycle — Component breakdown: input counts by application"></canvas>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                    <div id="input-panel-communication" class="input-tab-panel" role="tabpanel" aria-labelledby="input-tab-communication" hidden>
+                        <section class="input-chart-card" aria-labelledby="input-heading-communication-metrics">
+                            <h4 id="input-heading-communication-metrics" class="sr-only">Metric inputs</h4>
+                            <div class="comparison-scroll" tabindex="0" role="region" aria-labelledby="input-heading-communication-metrics">
+                                <div id="input-container-communication-metrics" class="relative w-full" style="min-width: 480px; height: 350px">
+                                    <canvas id="input-chart-communication-metrics" role="img" aria-label="Communication &amp; UI — Metric inputs: input counts by application"></canvas>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                    <div id="input-panel-platform" class="input-tab-panel" role="tabpanel" aria-labelledby="input-tab-platform" hidden>
+                        <section class="input-chart-card" aria-labelledby="input-heading-platform-metrics">
+                            <h4 id="input-heading-platform-metrics" class="sr-only">Metric inputs</h4>
+                            <div class="comparison-scroll" tabindex="0" role="region" aria-labelledby="input-heading-platform-metrics">
+                                <div id="input-container-platform-metrics" class="relative w-full" style="min-width: 480px; height: 350px">
+                                    <canvas id="input-chart-platform-metrics" role="img" aria-label="Callsites &amp; Platform — Metric inputs: input counts by application"></canvas>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Metric summary -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div>
+                    <h3 class="font-semibold text-slate-900">Metric Summary</h3>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                    <tr>
+                        <th class="px-5 py-3 font-semibold">APK / Package / Scope</th>
+                        <th class="px-3 py-3 font-semibold text-right" >CD <button type="button" class="metric-help" data-metric="CD" aria-label="About CD: Component Density" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></th>
+                        <th class="px-3 py-3 font-semibold text-right" >LL <button type="button" class="metric-help" data-metric="LL" aria-label="About LL: Lifecycle Load" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></th>
+                        <th class="px-3 py-3 font-semibold text-right" >IC <button type="button" class="metric-help" data-metric="IC" aria-label="About IC: ICC Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></th>
+                        <th class="px-3 py-3 font-semibold text-right" >UE <button type="button" class="metric-help" data-metric="UE" aria-label="About UE: UI Entanglement" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></th>
+                        <th class="px-3 py-3 font-semibold text-right" >AB <button type="button" class="metric-help" data-metric="AB" aria-label="About AB: Async Burden" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></th>
+                        <th class="px-3 py-3 font-semibold text-right" >PD <button type="button" class="metric-help" data-metric="PD" aria-label="About PD: Platform Dependence" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></th>
+                        <th class="px-3 py-3 font-semibold text-right" >FC <button type="button" class="metric-help" data-metric="FC" aria-label="About FC: Framework Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></th>
+                    </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-5 py-4">
+                            <div class="font-medium text-slate-900">A: illustrative-notes.apk</div>
+                            <div class="text-xs text-slate-500 font-mono mt-1">org.example.notes</div>
+                            <div class="text-xs text-slate-500 mt-1" title="All DEX-defined classes, including bundled library and generated code.">Scope: Artifact</div>
+                        </td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">0.0500</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">2.5000</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">2.0000</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">4.5000</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">0.0400</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">0.0200</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">0.4500</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-5 py-4">
+                            <div class="font-medium text-slate-900">B: illustrative-tasks.apk</div>
+                            <div class="text-xs text-slate-500 font-mono mt-1">org.example.tasks</div>
+                            <div class="text-xs text-slate-500 mt-1" title="All DEX-defined classes, including bundled library and generated code.">Scope: Artifact</div>
+                        </td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">0.0500</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">3.0000</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">3.0000</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">6.0000</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">0.0700</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">0.0300</td>
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">0.5500</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Dedicated two-app delta -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100">
+                <h3 class="font-semibold text-slate-900">Two-App Metric Differences</h3>
+                <p class="text-xs text-slate-500 mt-1 break-words">A: illustrative-notes.apk · Artifact<br>B: illustrative-tasks.apk · Artifact</p>
+                <p class="text-xs text-slate-500 mt-1">Difference = B − A. Relative difference uses A as the baseline.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                        <tr>
+                            <th class="px-5 py-3 text-left font-semibold">Metric</th>
+
+                            <th class="px-4 py-3 text-right font-semibold">Δ</th>
+                            <th class="px-5 py-3 text-right font-semibold">Relative Δ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="delta-table-body" class="divide-y divide-slate-100">
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-5 py-3">
+                                <div class="font-semibold text-slate-800">Component Density <span class="notation-label">CD</span> <button type="button" class="metric-help" data-metric="CD" aria-label="About CD: Component Density" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></div>
+                                <div class="text-[11px] text-slate-500 font-mono mt-1">A 0.0500 → B 0.0500</div>
+                            </td>
+                            <td class="px-4 py-3 text-right font-mono text-sm text-slate-900">+0.0000</td>
+                            <td class="px-5 py-3 text-right font-mono text-xs text-slate-600">+0.0%</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-5 py-3">
+                                <div class="font-semibold text-slate-800">Lifecycle Load <span class="notation-label">LL</span> <button type="button" class="metric-help" data-metric="LL" aria-label="About LL: Lifecycle Load" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></div>
+                                <div class="text-[11px] text-slate-500 font-mono mt-1">A 2.5000 → B 3.0000</div>
+                            </td>
+                            <td class="px-4 py-3 text-right font-mono text-sm text-slate-900">+0.5000</td>
+                            <td class="px-5 py-3 text-right font-mono text-xs text-slate-600">+20.0%</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-5 py-3">
+                                <div class="font-semibold text-slate-800">ICC Coupling <span class="notation-label">IC</span> <button type="button" class="metric-help" data-metric="IC" aria-label="About IC: ICC Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></div>
+                                <div class="text-[11px] text-slate-500 font-mono mt-1">A 2.0000 → B 3.0000</div>
+                            </td>
+                            <td class="px-4 py-3 text-right font-mono text-sm text-slate-900">+1.0000</td>
+                            <td class="px-5 py-3 text-right font-mono text-xs text-slate-600">+50.0%</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-5 py-3">
+                                <div class="font-semibold text-slate-800">UI Entanglement <span class="notation-label">UE</span> <button type="button" class="metric-help" data-metric="UE" aria-label="About UE: UI Entanglement" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></div>
+                                <div class="text-[11px] text-slate-500 font-mono mt-1">A 4.5000 → B 6.0000</div>
+                            </td>
+                            <td class="px-4 py-3 text-right font-mono text-sm text-slate-900">+1.5000</td>
+                            <td class="px-5 py-3 text-right font-mono text-xs text-slate-600">+33.3%</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-5 py-3">
+                                <div class="font-semibold text-slate-800">Async Burden <span class="notation-label">AB</span> <button type="button" class="metric-help" data-metric="AB" aria-label="About AB: Async Burden" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></div>
+                                <div class="text-[11px] text-slate-500 font-mono mt-1">A 0.0400 → B 0.0700</div>
+                            </td>
+                            <td class="px-4 py-3 text-right font-mono text-sm text-slate-900">+0.0300</td>
+                            <td class="px-5 py-3 text-right font-mono text-xs text-slate-600">+75.0%</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-5 py-3">
+                                <div class="font-semibold text-slate-800">Platform Dependence <span class="notation-label">PD</span> <button type="button" class="metric-help" data-metric="PD" aria-label="About PD: Platform Dependence" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></div>
+                                <div class="text-[11px] text-slate-500 font-mono mt-1">A 0.0200 → B 0.0300</div>
+                            </td>
+                            <td class="px-4 py-3 text-right font-mono text-sm text-slate-900">+0.0100</td>
+                            <td class="px-5 py-3 text-right font-mono text-xs text-slate-600">+50.0%</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-5 py-3">
+                                <div class="font-semibold text-slate-800">Framework Coupling <span class="notation-label">FC</span> <button type="button" class="metric-help" data-metric="FC" aria-label="About FC: Framework Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button></div>
+                                <div class="text-[11px] text-slate-500 font-mono mt-1">A 0.4500 → B 0.5500</div>
+                            </td>
+                            <td class="px-4 py-3 text-right font-mono text-sm text-slate-900">+0.1000</td>
+                            <td class="px-5 py-3 text-right font-mono text-xs text-slate-600">+22.2%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- FAILED ANALYSES                                                   -->
+    <!-- ================================================================ -->
+
+    <!-- ================================================================ -->
+    <!-- DETAILED APP ANALYSIS                                             -->
+    <!-- ================================================================ -->
+    <section class="space-y-6">
+        <div>
+            <h2 class="text-xl font-bold text-slate-800">Application Details</h2>
+            <p class="text-sm text-slate-500 mt-1">Metric values, calculation inputs, and supporting extracted evidence.</p>
+        </div>
+
+        <div class="space-y-8">
+            <article class="bg-white rounded-2xl shadow-sm border border-slate-200" id="apk-1">
+                <!-- App heading -->
+                <div class="bg-slate-50 border-b border-slate-200 px-6 py-5 rounded-t-2xl">
+                    <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div>
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <h3 class="text-lg font-bold text-slate-900">A: illustrative-notes.apk</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mt-2 font-medium">
+                                org.example.notes
+                                <span class="text-slate-300 mx-2">|</span>
+                                Min SDK:
+                                <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">23</span>
+                                <span class="ml-2">Target SDK:</span>
+                                <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">35</span>
+                            </p>
+                            <p class="text-xs text-slate-600 mt-3"><strong>Analysis scope: Artifact</strong> — All DEX-defined classes, including bundled library and generated code.</p>
+                            <details class="mt-3 text-xs text-slate-500">
+                                <summary class="metadata-summary"><span>Source metadata</span><svg class="disclosure-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></summary>
+                                <p class="mt-2">Recorded scope: all DEX-defined classes</p>
+                                <p class="mt-2">Version code: 1</p>
+                                <p class="mt-2">Taxonomy: illustrative</p>
+                                <p class="mt-2">Callsites: Dalvik invoke instructions in analyzed methods</p>
+                                <p class="mt-2">Framework: target class starts with Landroid/ or Landroidx/</p>
+                            <p class="text-[11px] text-slate-400 mt-2 font-mono break-all">APK: illustrative-notes.apk</p>
+                            <p class="text-[11px] text-slate-400 mt-2 font-mono break-all">SHA256: 0000000000000000000000000000000000000000000000000000000000000000</p>
+                            </details>
+                        </div>
+
+                        <button type="button"
+                                class="export-json no-print shrink-0 inline-flex items-center justify-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-slate-200 hover:border-indigo-300 text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors"
+                                data-index="1"
+                                title="Export this application's complete MOSAIC result as JSON">
+                            Export JSON
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-6 space-y-8">
+                    <!-- Metrics + inputs -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-slate-100 pb-2">
+                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Metric Values</h4>
+                                <span class="help-guidance">Hover or tap ⓘ for definitions and calculations.</span>
+                            </div>
+
+                            <ul class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm">
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Component Density</span>
+                                                <span class="notation-label">CD</span>
+                                                <button type="button" class="metric-help" data-metric="CD" data-record-index="1" aria-label="About CD: Component Density" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_comp / N_cls                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">0.0500</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Lifecycle Load</span>
+                                                <span class="notation-label">LL</span>
+                                                <button type="button" class="metric-help" data-metric="LL" data-record-index="1" aria-label="About LL: Lifecycle Load" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_lifecycle / N_comp                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">2.5000</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">ICC Coupling</span>
+                                                <span class="notation-label">IC</span>
+                                                <button type="button" class="metric-help" data-metric="IC" data-record-index="1" aria-label="About IC: ICC Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_icc / N_icc_comp                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">2.0000</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">UI Entanglement</span>
+                                                <span class="notation-label">UE</span>
+                                                <button type="button" class="metric-help" data-metric="UE" data-record-index="1" aria-label="About UE: UI Entanglement" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_ui_nonui / N_ui                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">4.5000</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Async Burden</span>
+                                                <span class="notation-label">AB</span>
+                                                <button type="button" class="metric-help" data-metric="AB" data-record-index="1" aria-label="About AB: Async Burden" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_async / N_call                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">0.0400</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Platform Dependence</span>
+                                                <span class="notation-label">PD</span>
+                                                <button type="button" class="metric-help" data-metric="PD" data-record-index="1" aria-label="About PD: Platform Dependence" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_res / N_call                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">0.0200</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Framework Coupling</span>
+                                                <span class="notation-label">FC</span>
+                                                <button type="button" class="metric-help" data-metric="FC" data-record-index="1" aria-label="About FC: Framework Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_fw / N_call                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">0.4500</span>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">Metric Inputs</h4>
+                            <ul class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm">
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Components and fragments (CD / LL)<span class="notation-label">N_comp</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="12">12</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Manifest components</span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="8">8</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Activity aliases</span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="0">0</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>ICC endpoints including aliases (IC)<span class="notation-label">N_icc_comp</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="8">8</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Fragment classes</span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="4">4</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Classes analyzed (selected scope)<span class="notation-label">N_cls</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="240">240</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Lifecycle callbacks<span class="notation-label">N_lifecycle</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="30">30</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>ICC callsites<span class="notation-label">N_icc</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="16">16</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>UI classes<span class="notation-label">N_ui</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="10">10</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Non-UI callsites in UI classes<span class="notation-label">N_ui_nonui</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="45">45</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Async callsites<span class="notation-label">N_async</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="160">160</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Resource callsites<span class="notation-label">N_res</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="80">80</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Total callsites<span class="notation-label">N_call</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="4000">4000</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Framework callsites (Android / AndroidX)<span class="notation-label">N_fw</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="1800">1800</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Evidence -->
+                    <details class="group bg-slate-50 rounded-xl border border-slate-200">
+                        <summary class="flex justify-between items-center font-medium cursor-pointer text-sm text-slate-700 p-4 hover:bg-slate-100 transition-colors rounded-xl select-none">
+                            <span>Supporting Evidence</span>
+                            <svg class="disclosure-arrow text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+                        </summary>
+
+                        <div class="p-6 border-t border-slate-200 bg-white rounded-b-xl overflow-hidden">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>Manifest Components</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">1</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="manifest_components"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <li class="evidence-item truncated p-0.5">
+                                                org.example.notes.MainActivity <span class="text-slate-400">(activity)</span><div>Lorg/example/notes/MainActivity;</div>                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>Activity Aliases</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">0</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="activity_aliases"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <li class="text-slate-400 italic">None detected</li>
+                                    </ul>
+                                </div>
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>Fragment Classes</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">0</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="fragment_classes"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <li class="text-slate-400 italic">None detected</li>
+                                    </ul>
+                                </div>
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>UI Classes</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">1</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="ui_classes"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <li class="evidence-item truncated p-0.5">
+                                                Lorg/example/notes/MainActivity;
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 text-[11px] text-slate-400 leading-relaxed">
+                                Evidence follows the selected Artifact scope. Framework callsites count calls targeting android.* / androidx.* APIs; other library targets are excluded from that numerator.
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </article>
+            <article class="bg-white rounded-2xl shadow-sm border border-slate-200" id="apk-2">
+                <!-- App heading -->
+                <div class="bg-slate-50 border-b border-slate-200 px-6 py-5 rounded-t-2xl">
+                    <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div>
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <h3 class="text-lg font-bold text-slate-900">B: illustrative-tasks.apk</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mt-2 font-medium">
+                                org.example.tasks
+                                <span class="text-slate-300 mx-2">|</span>
+                                Min SDK:
+                                <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">23</span>
+                                <span class="ml-2">Target SDK:</span>
+                                <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">35</span>
+                            </p>
+                            <p class="text-xs text-slate-600 mt-3"><strong>Analysis scope: Artifact</strong> — All DEX-defined classes, including bundled library and generated code.</p>
+                            <details class="mt-3 text-xs text-slate-500">
+                                <summary class="metadata-summary"><span>Source metadata</span><svg class="disclosure-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></summary>
+                                <p class="mt-2">Recorded scope: all DEX-defined classes</p>
+                                <p class="mt-2">Version code: 1</p>
+                                <p class="mt-2">Taxonomy: illustrative</p>
+                                <p class="mt-2">Callsites: Dalvik invoke instructions in analyzed methods</p>
+                                <p class="mt-2">Framework: target class starts with Landroid/ or Landroidx/</p>
+                            <p class="text-[11px] text-slate-400 mt-2 font-mono break-all">APK: illustrative-tasks.apk</p>
+                            <p class="text-[11px] text-slate-400 mt-2 font-mono break-all">SHA256: 0000000000000000000000000000000000000000000000000000000000000000</p>
+                            </details>
+                        </div>
+
+                        <button type="button"
+                                class="export-json no-print shrink-0 inline-flex items-center justify-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-slate-200 hover:border-indigo-300 text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors"
+                                data-index="2"
+                                title="Export this application's complete MOSAIC result as JSON">
+                            Export JSON
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-6 space-y-8">
+                    <!-- Metrics + inputs -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-slate-100 pb-2">
+                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Metric Values</h4>
+                                <span class="help-guidance">Hover or tap ⓘ for definitions and calculations.</span>
+                            </div>
+
+                            <ul class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm">
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Component Density</span>
+                                                <span class="notation-label">CD</span>
+                                                <button type="button" class="metric-help" data-metric="CD" data-record-index="2" aria-label="About CD: Component Density" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_comp / N_cls                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">0.0500</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Lifecycle Load</span>
+                                                <span class="notation-label">LL</span>
+                                                <button type="button" class="metric-help" data-metric="LL" data-record-index="2" aria-label="About LL: Lifecycle Load" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_lifecycle / N_comp                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">3.0000</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">ICC Coupling</span>
+                                                <span class="notation-label">IC</span>
+                                                <button type="button" class="metric-help" data-metric="IC" data-record-index="2" aria-label="About IC: ICC Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_icc / N_icc_comp                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">3.0000</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">UI Entanglement</span>
+                                                <span class="notation-label">UE</span>
+                                                <button type="button" class="metric-help" data-metric="UE" data-record-index="2" aria-label="About UE: UI Entanglement" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_ui_nonui / N_ui                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">6.0000</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Async Burden</span>
+                                                <span class="notation-label">AB</span>
+                                                <button type="button" class="metric-help" data-metric="AB" data-record-index="2" aria-label="About AB: Async Burden" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_async / N_call                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">0.0700</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Platform Dependence</span>
+                                                <span class="notation-label">PD</span>
+                                                <button type="button" class="metric-help" data-metric="PD" data-record-index="2" aria-label="About PD: Platform Dependence" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_res / N_call                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">0.0300</span>
+                                    </div>
+                                </li>
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">Framework Coupling</span>
+                                                <span class="notation-label">FC</span>
+                                                <button type="button" class="metric-help" data-metric="FC" data-record-index="2" aria-label="About FC: Framework Coupling" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+                                            </div>
+
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+N_fw / N_call                                            </div>
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">0.5500</span>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">Metric Inputs</h4>
+                            <ul class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm">
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Components and fragments (CD / LL)<span class="notation-label">N_comp</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="18">18</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Manifest components</span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="12">12</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Activity aliases</span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="0">0</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>ICC endpoints including aliases (IC)<span class="notation-label">N_icc_comp</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="12">12</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Fragment classes</span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="6">6</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Classes analyzed (selected scope)<span class="notation-label">N_cls</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="360">360</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Lifecycle callbacks<span class="notation-label">N_lifecycle</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="54">54</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>ICC callsites<span class="notation-label">N_icc</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="36">36</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>UI classes<span class="notation-label">N_ui</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="14">14</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Non-UI callsites in UI classes<span class="notation-label">N_ui_nonui</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="84">84</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Async callsites<span class="notation-label">N_async</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="420">420</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Resource callsites<span class="notation-label">N_res</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="180">180</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Total callsites<span class="notation-label">N_call</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="6000">6000</span>
+                                </li>
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>Framework callsites (Android / AndroidX)<span class="notation-label">N_fw</span></span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="3300">3300</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Evidence -->
+                    <details class="group bg-slate-50 rounded-xl border border-slate-200">
+                        <summary class="flex justify-between items-center font-medium cursor-pointer text-sm text-slate-700 p-4 hover:bg-slate-100 transition-colors rounded-xl select-none">
+                            <span>Supporting Evidence</span>
+                            <svg class="disclosure-arrow text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+                        </summary>
+
+                        <div class="p-6 border-t border-slate-200 bg-white rounded-b-xl overflow-hidden">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>Manifest Components</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">1</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="manifest_components"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <li class="evidence-item truncated p-0.5">
+                                                org.example.tasks.MainActivity <span class="text-slate-400">(activity)</span><div>Lorg/example/tasks/MainActivity;</div>                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>Activity Aliases</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">0</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="activity_aliases"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <li class="text-slate-400 italic">None detected</li>
+                                    </ul>
+                                </div>
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>Fragment Classes</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">0</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="fragment_classes"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <li class="text-slate-400 italic">None detected</li>
+                                    </ul>
+                                </div>
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>UI Classes</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">1</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="ui_classes"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <li class="evidence-item truncated p-0.5">
+                                                Lorg/example/tasks/MainActivity;
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 text-[11px] text-slate-400 leading-relaxed">
+                                Evidence follows the selected Artifact scope. Framework callsites count calls targeting android.* / androidx.* APIs; other library targets are excluded from that numerator.
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <!-- ================================================================ -->
+</div>
+
+<div id="metric-popover" role="dialog" aria-modal="false" aria-labelledby="metric-help-title" hidden>
+    <button type="button" id="metric-help-close" aria-label="Close metric information">×</button>
+    <h3 id="metric-help-title"></h3>
+    <div id="metric-help-body" tabindex="0" role="region" aria-label="Metric explanation and application calculations">
+    <p id="metric-help-description"></p>
+    <p id="metric-help-formula"></p>
+    <div id="metric-help-calculations"></div>
+    </div>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const metricInfo = {"AB": {"description": "What share of all callsites involves asynchronous or concurrent execution (threads, handlers, executors, coroutines, Rx chains, work schedulers).", "formula": "N_async / N_call", "name": "Async Burden"}, "CD": {"description": "How much of the code in the selected scope is organized into Android components (Activities, Services, Broadcast Receivers, Content Providers) and Fragments.", "formula": "N_comp / N_cls", "name": "Component Density"}, "FC": {"description": "What share of all callsites targets Android framework APIs (android.* / androidx.*); third-party libraries are excluded.", "formula": "N_fw / N_call", "name": "Framework Coupling"}, "IC": {"description": "ICC callsites per manifest endpoint (Activities, Services, Receivers, Providers, and activity aliases). Fragments are excluded from this denominator.", "formula": "N_icc / N_icc_comp", "name": "ICC Coupling"}, "LL": {"description": "How many Android lifecycle callbacks (such as onCreate or onResume) the average component implements.", "formula": "N_lifecycle / N_comp", "name": "Lifecycle Load"}, "PD": {"description": "What share of all callsites touches resource-sensitive platform APIs (camera, location, sensors, Bluetooth, media, notifications, etc.).", "formula": "N_res / N_call", "name": "Platform Dependence"}, "UE": {"description": "How much non-UI work (network, database, file I/O, crypto, async) is embedded inside UI classes such as Activities and Fragments.", "formula": "N_ui_nonui / N_ui", "name": "UI Entanglement"}};
+    function appendNotation(element, notation) {
+        if (!notation) return;
+        const label = document.createElement('span');
+        label.className = 'notation-label';
+        label.textContent = notation;
+        element.append(label);
+    }
+    document.querySelectorAll('[data-count]').forEach(label => {
+        const value = Number(label.dataset.count);
+        if (Number.isFinite(value)) label.textContent = new Intl.NumberFormat('en-US').format(value);
+    });
+    const calculationRecords = [
+        {
+            index: 1,
+            name: "A: illustrative-notes.apk \u00b7 Artifact",
+            metrics: {
+                "CD": {"display": "12 / 240 = 0.0500", "inputs": [{"label": "Components and fragments (CD / LL)", "symbol": "N_comp", "value": "12"}, {"label": "Classes analyzed (selected scope)", "symbol": "N_cls", "value": "240"}]},
+                "LL": {"display": "30 / 12 = 2.5000", "inputs": [{"label": "Lifecycle callbacks", "symbol": "N_lifecycle", "value": "30"}, {"label": "Components and fragments (CD / LL)", "symbol": "N_comp", "value": "12"}]},
+                "IC": {"display": "16 / 8 = 2.0000", "inputs": [{"label": "ICC callsites", "symbol": "N_icc", "value": "16"}, {"label": "ICC endpoints including aliases (IC)", "symbol": "N_icc_comp", "value": "8"}]},
+                "UE": {"display": "45 / 10 = 4.5000", "inputs": [{"label": "Non-UI callsites in UI classes", "symbol": "N_ui_nonui", "value": "45"}, {"label": "UI classes", "symbol": "N_ui", "value": "10"}]},
+                "AB": {"display": "160 / 4000 = 0.0400", "inputs": [{"label": "Async callsites", "symbol": "N_async", "value": "160"}, {"label": "Total callsites", "symbol": "N_call", "value": "4000"}]},
+                "PD": {"display": "80 / 4000 = 0.0200", "inputs": [{"label": "Resource callsites", "symbol": "N_res", "value": "80"}, {"label": "Total callsites", "symbol": "N_call", "value": "4000"}]},
+                "FC": {"display": "1800 / 4000 = 0.4500", "inputs": [{"label": "Framework callsites (Android / AndroidX)", "symbol": "N_fw", "value": "1800"}, {"label": "Total callsites", "symbol": "N_call", "value": "4000"}]},
+            }
+        },
+        {
+            index: 2,
+            name: "B: illustrative-tasks.apk \u00b7 Artifact",
+            metrics: {
+                "CD": {"display": "18 / 360 = 0.0500", "inputs": [{"label": "Components and fragments (CD / LL)", "symbol": "N_comp", "value": "18"}, {"label": "Classes analyzed (selected scope)", "symbol": "N_cls", "value": "360"}]},
+                "LL": {"display": "54 / 18 = 3.0000", "inputs": [{"label": "Lifecycle callbacks", "symbol": "N_lifecycle", "value": "54"}, {"label": "Components and fragments (CD / LL)", "symbol": "N_comp", "value": "18"}]},
+                "IC": {"display": "36 / 12 = 3.0000", "inputs": [{"label": "ICC callsites", "symbol": "N_icc", "value": "36"}, {"label": "ICC endpoints including aliases (IC)", "symbol": "N_icc_comp", "value": "12"}]},
+                "UE": {"display": "84 / 14 = 6.0000", "inputs": [{"label": "Non-UI callsites in UI classes", "symbol": "N_ui_nonui", "value": "84"}, {"label": "UI classes", "symbol": "N_ui", "value": "14"}]},
+                "AB": {"display": "420 / 6000 = 0.0700", "inputs": [{"label": "Async callsites", "symbol": "N_async", "value": "420"}, {"label": "Total callsites", "symbol": "N_call", "value": "6000"}]},
+                "PD": {"display": "180 / 6000 = 0.0300", "inputs": [{"label": "Resource callsites", "symbol": "N_res", "value": "180"}, {"label": "Total callsites", "symbol": "N_call", "value": "6000"}]},
+                "FC": {"display": "3300 / 6000 = 0.5500", "inputs": [{"label": "Framework callsites (Android / AndroidX)", "symbol": "N_fw", "value": "3300"}, {"label": "Total callsites", "symbol": "N_call", "value": "6000"}]},
+            }
+        },
+    ];
+    const chartValues = document.createElement('div');
+    chartValues.id = 'chart-value-popover';
+    chartValues.hidden = true;
+    chartValues.setAttribute('role', 'dialog');
+    chartValues.setAttribute('aria-label', 'Chart values');
+    document.body.appendChild(chartValues);
+    let chartValuesPinned = false;
+    let valueChart = null;
+    function hideChartValues() {
+        const restoreFocus = chartValues.contains(document.activeElement);
+        chartValues.hidden = true;
+        if (restoreFocus) valueChart?.canvas.focus({ preventScroll: true });
+        chartValues.classList.remove('pinned');
+        chartValuesPinned = false;
+    }
+    const popover = document.getElementById('metric-popover');
+    const helpBody = document.getElementById('metric-help-body');
+    let helpButton = null;
+    let pinned = false;
+    let hideTimer;
+    function hideHelp() {
+        clearTimeout(hideTimer);
+        if (helpButton) helpButton.setAttribute('aria-expanded', 'false');
+        popover.hidden = true;
+        helpButton = null;
+        pinned = false;
+    }
+    function showHelp(button) {
+        clearTimeout(hideTimer);
+        if (helpButton === button && !popover.hidden) return;
+        if (helpButton && helpButton !== button) hideHelp();
+        hideChartValues();
+        helpButton = button;
+        const info = metricInfo[button.dataset.metric];
+        const helpTitle = document.getElementById('metric-help-title');
+        helpTitle.textContent = info.name;
+        appendNotation(helpTitle, button.dataset.metric);
+        document.getElementById('metric-help-description').textContent = info.description;
+        document.getElementById('metric-help-formula').textContent = 'Formula: ' + info.formula;
+        const calculations = document.getElementById('metric-help-calculations');
+        calculations.replaceChildren();
+        const selectedRecords = calculationRecords.filter(record =>
+            !button.dataset.recordIndex || record.index === Number(button.dataset.recordIndex));
+        selectedRecords.forEach(record => {
+            const calculation = record.metrics[button.dataset.metric];
+            const section = document.createElement('section');
+            section.className = 'metric-calculation';
+            const title = document.createElement('h4');
+            title.textContent = record.name;
+            const inputs = document.createElement('dl');
+            calculation.inputs.forEach(input => {
+                const label = document.createElement('dt');
+                label.textContent = input.label;
+                appendNotation(label, input.symbol);
+                const value = document.createElement('dd');
+                value.textContent = typeof input.value === 'number' ? new Intl.NumberFormat('en-US').format(input.value) : input.value;
+                inputs.append(label, value);
+            });
+            const result = document.createElement('p');
+            result.className = 'metric-calculation-result';
+            result.textContent = calculation.display;
+            section.append(title, inputs, result);
+            calculations.append(section);
+        });
+        popover.hidden = false;
+        helpBody.scrollTop = 0;
+        button.setAttribute('aria-expanded', 'true');
+        const box = button.getBoundingClientRect();
+        const width = popover.offsetWidth, height = popover.offsetHeight;
+        popover.style.left = Math.max(12, Math.min(box.left, window.innerWidth - width - 12)) + 'px';
+        const preferredTop = box.bottom + height + 20 <= window.innerHeight ? box.bottom + 8 : box.top - height - 8;
+        popover.style.top = Math.max(12, Math.min(preferredTop, window.innerHeight - height - 12)) + 'px';
+    }
+    function scheduleHide() {
+        clearTimeout(hideTimer);
+        if (!pinned) hideTimer = setTimeout(() => {
+            if (!popover.matches(':hover, :focus-within') && !helpButton?.matches(':hover')) hideHelp();
+        }, 350);
+    }
+    document.querySelectorAll('.metric-help').forEach(button => {
+        button.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch' && !pinned) showHelp(button); });
+        button.addEventListener('pointerleave', scheduleHide);
+        button.addEventListener('focus', () => { if (!pinned) showHelp(button); });
+        button.addEventListener('blur', event => { if (!popover.contains(event.relatedTarget)) scheduleHide(); });
+        button.addEventListener('click', () => {
+            if (helpButton === button && pinned) hideHelp();
+            else { showHelp(button); pinned = true; helpBody.focus({ preventScroll: true }); }
+        });
+    });
+    popover.addEventListener('pointerenter', () => clearTimeout(hideTimer));
+    popover.addEventListener('focusin', () => clearTimeout(hideTimer));
+    popover.addEventListener('pointerleave', scheduleHide);
+    popover.addEventListener('focusout', event => { if (!popover.contains(event.relatedTarget) && event.relatedTarget !== helpButton) scheduleHide(); });
+    document.getElementById('metric-help-close').addEventListener('click', () => {
+        const previous = helpButton;
+        if (previous) previous.focus();
+        hideHelp();
+    });
+    document.addEventListener('click', event => { if (!popover.contains(event.target) && !event.target.closest('.metric-help')) hideHelp(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') { const previous = helpButton; if (previous) previous.focus(); hideHelp(); } });
+    window.addEventListener('resize', hideHelp);
+    window.addEventListener('scroll', event => { if (!popover.contains(event.target)) hideHelp(); }, true);
+
+    // ------------------------------------------------------------------
+    // Evidence expand/collapse
+    // ------------------------------------------------------------------
+    function updateEvidenceToggle(column) {
+        const button = column?.querySelector('.evidence-toggle-expand.all');
+        if (!button) return;
+        const items = Array.from(column.querySelectorAll('.evidence-item'));
+        button.textContent = items.length && items.every(li => !li.classList.contains('truncated'))
+            ? 'Collapse All' : 'Expand All';
+    }
+    document.querySelectorAll('.evidence-item').forEach(li => {
+        li.classList.add('expandable');
+        li.tabIndex = 0;
+        li.setAttribute('role', 'button');
+        li.setAttribute('aria-expanded', 'false');
+        li.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); li.click(); }
+        });
+        li.addEventListener('click', () => {
+            const expanded = li.classList.contains('truncated');
+            li.setAttribute('aria-expanded', String(expanded));
+            li.classList.toggle('truncated', !expanded);
+            updateEvidenceToggle(li.closest('.flex.flex-col'));
+        });
+    });
+
+    document.querySelectorAll('.evidence-toggle-expand.all').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const column = btn.closest('.flex.flex-col');
+            const list = column ? column.querySelector('ul') : null;
+            if (!list) return;
+            const items = list.querySelectorAll('.evidence-item');
+            const isAnyCollapsed = Array.from(items).some(li => li.classList.contains('truncated'));
+            items.forEach(li => {
+                li.classList.toggle('truncated', !isAnyCollapsed);
+                li.setAttribute('aria-expanded', String(isAnyCollapsed));
+            });
+            updateEvidenceToggle(column);
+        });
+    });
+
+    // ------------------------------------------------------------------
+    // Chart data
+    // ------------------------------------------------------------------
+    if (typeof Chart === 'undefined') return;
+
+    Chart.defaults.color = '#64748b';
+    Chart.defaults.font.family = "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+    if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+    Chart.register({
+        id: 'reportKeyboardValues',
+        afterInit(chart) {
+            const canvas = chart.canvas;
+            canvas.tabIndex = 0;
+            canvas.setAttribute('aria-label', canvas.getAttribute('aria-label') + '. Use arrow keys to explore values; Escape to close.');
+            let selected = 0;
+            canvas.addEventListener('keydown', event => {
+                if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' '].includes(event.key)) return;
+                event.preventDefault();
+                const length = chart.data.labels.length;
+                if (!length || !chart.data.datasets.length) return;
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') selected = (selected + length - 1) % length;
+                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') selected = (selected + 1) % length;
+                hideChartValues();
+                chart.tooltip.setActiveElements([{ datasetIndex: 0, index: selected }], { x: chart.width / 2, y: chart.height / 2 });
+                chart.update('none');
+                if (event.key === 'Enter' || event.key === ' ') {
+                    chartValuesPinned = true;
+                    chartValues.classList.add('pinned');
+                    chartValues.querySelector('button')?.focus({ preventScroll: true });
+                }
+            });
+            canvas.addEventListener('blur', event => {
+                if (!chartValues.contains(event.relatedTarget)) hideChartValues();
+            });
+        }
+    });
+
+    const metricOrder = ["CD", "LL", "IC", "UE", "AB", "PD", "FC"];
+    const metricNames = [
+"Component Density","Lifecycle Load","ICC Coupling","UI Entanglement","Async Burden","Platform Dependence","Framework Coupling",    ];
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6'];
+
+    const records = [
+        {
+            index: 1,
+            name: "A: illustrative-notes.apk \u00b7 Artifact",
+            packageName: "org.example.notes",
+            active: true,
+            metricsRaw: [
+Number.isFinite(Number("0.0500")) ? Number("0.0500") : null,Number.isFinite(Number("2.5000")) ? Number("2.5000") : null,Number.isFinite(Number("2.0000")) ? Number("2.0000") : null,Number.isFinite(Number("4.5000")) ? Number("4.5000") : null,Number.isFinite(Number("0.0400")) ? Number("0.0400") : null,Number.isFinite(Number("0.0200")) ? Number("0.0200") : null,Number.isFinite(Number("0.4500")) ? Number("0.4500") : null,            ],
+            counts: [Number.isFinite(Number("12")) ? Number("12") : null,Number.isFinite(Number("8")) ? Number("8") : null,Number.isFinite(Number("0")) ? Number("0") : null,Number.isFinite(Number("8")) ? Number("8") : null,Number.isFinite(Number("4")) ? Number("4") : null,Number.isFinite(Number("240")) ? Number("240") : null,Number.isFinite(Number("30")) ? Number("30") : null,Number.isFinite(Number("16")) ? Number("16") : null,Number.isFinite(Number("10")) ? Number("10") : null,Number.isFinite(Number("45")) ? Number("45") : null,Number.isFinite(Number("160")) ? Number("160") : null,Number.isFinite(Number("80")) ? Number("80") : null,Number.isFinite(Number("4000")) ? Number("4000") : null,Number.isFinite(Number("1800")) ? Number("1800") : null,],
+            countKeys: ["components_total_for_cd_ll","manifest_components","activity_aliases","icc_components_for_ic","fragment_classes","classes_analyzed_total","lifecycle_callbacks","icc_callsites","ui_classes","ui_nonui_callsites","async_callsites","resource_callsites","callsites_total","callsites_framework_android_androidx",],
+            countLabels: ["Components and fragments (CD / LL)","Manifest components","Activity aliases","ICC endpoints including aliases (IC)","Fragment classes","Classes analyzed (selected scope)","Lifecycle callbacks","ICC callsites","UI classes","Non-UI callsites in UI classes","Async callsites","Resource callsites","Total callsites","Framework callsites (Android / AndroidX)",],
+            countSymbols: ["N_comp","","","N_icc_comp","","N_cls","N_lifecycle","N_icc","N_ui","N_ui_nonui","N_async","N_res","N_call","N_fw",]
+        },
+        {
+            index: 2,
+            name: "B: illustrative-tasks.apk \u00b7 Artifact",
+            packageName: "org.example.tasks",
+            active: true,
+            metricsRaw: [
+Number.isFinite(Number("0.0500")) ? Number("0.0500") : null,Number.isFinite(Number("3.0000")) ? Number("3.0000") : null,Number.isFinite(Number("3.0000")) ? Number("3.0000") : null,Number.isFinite(Number("6.0000")) ? Number("6.0000") : null,Number.isFinite(Number("0.0700")) ? Number("0.0700") : null,Number.isFinite(Number("0.0300")) ? Number("0.0300") : null,Number.isFinite(Number("0.5500")) ? Number("0.5500") : null,            ],
+            counts: [Number.isFinite(Number("18")) ? Number("18") : null,Number.isFinite(Number("12")) ? Number("12") : null,Number.isFinite(Number("0")) ? Number("0") : null,Number.isFinite(Number("12")) ? Number("12") : null,Number.isFinite(Number("6")) ? Number("6") : null,Number.isFinite(Number("360")) ? Number("360") : null,Number.isFinite(Number("54")) ? Number("54") : null,Number.isFinite(Number("36")) ? Number("36") : null,Number.isFinite(Number("14")) ? Number("14") : null,Number.isFinite(Number("84")) ? Number("84") : null,Number.isFinite(Number("420")) ? Number("420") : null,Number.isFinite(Number("180")) ? Number("180") : null,Number.isFinite(Number("6000")) ? Number("6000") : null,Number.isFinite(Number("3300")) ? Number("3300") : null,],
+            countKeys: ["components_total_for_cd_ll","manifest_components","activity_aliases","icc_components_for_ic","fragment_classes","classes_analyzed_total","lifecycle_callbacks","icc_callsites","ui_classes","ui_nonui_callsites","async_callsites","resource_callsites","callsites_total","callsites_framework_android_androidx",],
+            countLabels: ["Components and fragments (CD / LL)","Manifest components","Activity aliases","ICC endpoints including aliases (IC)","Fragment classes","Classes analyzed (selected scope)","Lifecycle callbacks","ICC callsites","UI classes","Non-UI callsites in UI classes","Async callsites","Resource callsites","Total callsites","Framework callsites (Android / AndroidX)",],
+            countSymbols: ["N_comp","","","N_icc_comp","","N_cls","N_lifecycle","N_icc","N_ui","N_ui_nonui","N_async","N_res","N_call","N_fw",]
+        },
+    ];
+
+    if (records.length === 0) return;
+
+    const globalMax = metricOrder.map((mid, idx) => Math.max(...records.map(r => r.metricsRaw[idx]), 0.0000001));
+    records.forEach(r => {
+        r.metricsNormalized = r.metricsRaw.map((val, idx) => val === null ? null : val / globalMax[idx]);
+    });
+
+    function formatCompact(value) {
+        if (!isFinite(value) || value === 0) return '0';
+        const abs = Math.abs(value);
+        if (abs >= 1e9) return (value / 1e9).toFixed(abs >= 1e10 ? 0 : 1) + 'B';
+        if (abs >= 1e6) return (value / 1e6).toFixed(abs >= 1e7 ? 0 : 1) + 'M';
+        if (abs >= 1e3) return (value / 1e3).toFixed(abs >= 1e4 ? 0 : 1) + 'k';
+        return String(Math.round(value));
+    }
+
+    function formatMetric(value) {
+        if (value === null || !isFinite(value)) return 'n/a';
+        return value.toFixed(4);
+    }
+
+    function chartTooltip(kind) {
+        return ({ chart, tooltip }) => {
+            if (chartValuesPinned) return;
+            if (!tooltip.opacity || !tooltip.dataPoints?.length) { hideChartValues(); return; }
+            hideHelp();
+            valueChart = chart;
+            const index = tooltip.dataPoints[0].dataIndex;
+            const heading = document.createElement('h3');
+            heading.textContent = kind === 'counts' ? chart.data.labels[index] : metricNames[index];
+            appendNotation(heading, kind === 'counts' ? chart.data.datasets[0]._symbols[index] : metricOrder[index]);
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.textContent = '×';
+            close.setAttribute('aria-label', 'Close chart values');
+            close.addEventListener('click', hideChartValues);
+            const rows = document.createElement('div');
+            rows.className = 'chart-value-rows';
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+                if (!chart.isDatasetVisible(datasetIndex)) return;
+                const row = document.createElement('div');
+                row.className = 'chart-value-row';
+                const swatch = document.createElement('span');
+                swatch.className = 'chart-value-swatch';
+                swatch.style.background = dataset.borderColor || dataset.backgroundColor;
+                const name = document.createElement('span');
+                name.className = 'chart-value-name';
+                name.textContent = dataset.label;
+                const number = document.createElement('span');
+                number.className = 'chart-value-number';
+                const value = (dataset._raw || dataset.data)[index];
+                number.textContent = kind === 'counts' ? (value === null ? 'n/a' : new Intl.NumberFormat('en-US').format(value)) : formatMetric(value);
+                row.append(swatch, name, number);
+                rows.append(row);
+            });
+            chartValues.replaceChildren(heading, close, rows);
+            chartValues.hidden = false;
+            const box = chart.canvas.getBoundingClientRect();
+            const left = box.left + tooltip.caretX + 12;
+            const top = box.top + tooltip.caretY + 12;
+            chartValues.style.left = Math.max(12, Math.min(left, innerWidth - chartValues.offsetWidth - 12)) + 'px';
+            chartValues.style.top = Math.max(12, Math.min(top, innerHeight - chartValues.offsetHeight - 12)) + 'px';
+        };
+    }
+    document.addEventListener('click', event => {
+        if (event.target.matches('canvas')) {
+            requestAnimationFrame(() => {
+                if (event.target !== valueChart?.canvas || chartValues.hidden) return;
+                chartValuesPinned = true;
+                chartValues.classList.add('pinned');
+                chartValues.querySelector('button').focus({ preventScroll: true });
+            });
+        } else if (!chartValues.contains(event.target)) hideChartValues();
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') hideChartValues(); });
+    window.addEventListener('resize', hideChartValues);
+    window.addEventListener('scroll', event => { if (!chartValues.contains(event.target)) hideChartValues(); }, true);
+    records.forEach(record => {
+        if (records.filter(other => other.name === record.name).length > 1) record.displaySuffix = ` · Record ${record.index}`;
+    });
+    records.forEach(record => { record.name += record.displaySuffix || ''; });
+
+    // ------------------------------------------------------------------
+    // Single-app profile
+    // ------------------------------------------------------------------
+    const singleCanvas = document.getElementById('single-profile-chart');
+    if (singleCanvas && records.length === 1) {
+        const r = records[0];
+        const positiveValues = r.metricsRaw.filter(value => value !== null && value > 0);
+        const logMin = positiveValues.length ? Math.pow(10, Math.floor(Math.log10(Math.min(...positiveValues))) - 1) : 0.001;
+        const logMax = positiveValues.length ? Math.pow(10, Math.ceil(Math.log10(Math.max(...positiveValues)))) : 1;
+        const singleMetricLabels = {
+            id: 'singleMetricLabels',
+            beforeLayout(chart) {
+                chart.options.layout.padding.left = chart.width < 450 ? 170 : 215;
+            },
+            afterLayout(chart) {
+                document.querySelectorAll('#single-metric-labels [data-axis]').forEach(label => {
+                    label.style.width = (chart.chartArea.left - 10) + 'px';
+                    label.style.top = chart.scales.y.getPixelForValue(Number(label.dataset.axis)) + 'px';
+                });
+                document.querySelectorAll('#single-metric-labels [data-value]').forEach(label => {
+                    const index = Number(label.dataset.value);
+                    const value = r.metricsRaw[index];
+                    label.textContent = value === null ? 'n/a' : value <= 0 ? formatMetric(value) + ' (not plotted)' : formatMetric(value);
+                    label.style.left = (chart.scales.x.getPixelForValue(value > 0 ? value : logMin) + 8) + 'px';
+                    label.style.top = chart.scales.y.getPixelForValue(index) + 'px';
+                });
+            }
+        };
+        new Chart(singleCanvas, {
+            type: 'bar',
+            plugins: [singleMetricLabels],
+            data: {
+                labels: metricNames,
+                datasets: [{
+                    label: r.name,
+                    _raw: r.metricsRaw,
+                    data: r.metricsRaw.map(value => value > 0 ? value : null),
+                    backgroundColor: '#6366f1cc',
+                    borderRadius: 5,
+                    datalabels: { display: false }
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                layout: { padding: { left: 215, right: 65 } },
+                plugins: {
+                    legend: { display: false },
+                    datalabels: { display: false },
+                    tooltip: { enabled: false, mode: 'nearest', intersect: true, external: chartTooltip('metrics') }
+                },
+                scales: {
+                    x: { type: 'logarithmic', min: logMin, max: logMax, grid: { color: '#f1f5f9' }, ticks: { maxTicksLimit: 5 } },
+                    y: { display: false }
+                }
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Multi-app charts
+    // ------------------------------------------------------------------
+    if (records.length > 1) {
+        const comparisonLimit = 6;
+        records.forEach((record, index) => {
+            record.active = index < comparisonLimit;
+            record.color = colors[index % colors.length];
+        });
+        const selectionStatus = document.getElementById('comparison-selection-status');
+        const inputGroupDefinitions = [{"id": "structure", "sections": [{"id": "structure-metrics", "keys": ["classes_analyzed_total", "components_total_for_cd_ll", "lifecycle_callbacks"], "title": "Metric inputs"}, {"id": "component-breakdown", "keys": ["manifest_components", "fragment_classes"], "title": "Component breakdown"}], "title": "Structure \u0026 Lifecycle"}, {"id": "communication", "sections": [{"id": "communication-metrics", "keys": ["icc_components_for_ic", "activity_aliases", "icc_callsites", "ui_classes", "ui_nonui_callsites"], "title": "Metric inputs"}], "title": "Communication \u0026 UI"}, {"id": "platform", "sections": [{"id": "platform-metrics", "keys": ["callsites_total", "async_callsites", "resource_callsites", "callsites_framework_android_androidx"], "title": "Metric inputs"}], "title": "Callsites \u0026 Platform"}];
+        let activeInputGroup = inputGroupDefinitions[0].id;
+        const inputGroups = inputGroupDefinitions.flatMap(group => group.sections.map(section => ({
+            ...section,
+            tabId: group.id,
+            indices: section.keys.map(key => records[0].countKeys.indexOf(key)),
+            container: document.getElementById('input-container-' + section.id),
+            chart: null
+        })));
+        const inputTabs = Array.from(document.querySelectorAll('[data-input-group]'));
+        function selectInputGroup(id) {
+            hideChartValues();
+            activeInputGroup = id;
+            inputTabs.forEach(tab => {
+                const selected = tab.dataset.inputGroup === id;
+                tab.setAttribute('aria-selected', String(selected));
+                tab.tabIndex = selected ? 0 : -1;
+                document.getElementById(tab.getAttribute('aria-controls')).hidden = !selected;
+            });
+            updateInputCharts();
+        }
+        inputTabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => selectInputGroup(tab.dataset.inputGroup));
+            tab.addEventListener('keydown', event => {
+                let next;
+                if (event.key === 'ArrowRight') next = (index + 1) % inputTabs.length;
+                else if (event.key === 'ArrowLeft') next = (index + inputTabs.length - 1) % inputTabs.length;
+                else if (event.key === 'Home') next = 0;
+                else if (event.key === 'End') next = inputTabs.length - 1;
+                else return;
+                event.preventDefault();
+                selectInputGroup(inputTabs[next].dataset.inputGroup);
+                inputTabs[next].focus();
+            });
+        });
+        const inputScrollObserver = new ResizeObserver(entries => {
+            entries.forEach(({ target }) => {
+                target.tabIndex = target.scrollWidth > target.clientWidth + 1 ? 0 : -1;
+            });
+        });
+        inputGroups.forEach(group => inputScrollObserver.observe(group.container.parentElement));
+        const toggleContainer = document.getElementById('chart-toggles');
+        if (toggleContainer) {
+            records.forEach((r, i) => {
+                const btn = document.createElement('button');
+                let color = r.color;
+                btn.className = 'dataset-toggle px-3 py-2 rounded-lg text-xs font-medium border bg-white';
+                btn.type = 'button';
+                btn.style.borderColor = r.active ? color : '';
+                btn.style.color = r.active ? color : '';
+                btn.innerText = r.name;
+                btn.classList.toggle('disabled', !r.active);
+                btn.setAttribute('aria-pressed', String(r.active));
+                btn.addEventListener('click', () => {
+                    if (!r.active && records.filter(record => record.active).length >= comparisonLimit) {
+                        selectionStatus.textContent = 'Six applications are already selected. Hide one before adding another.';
+                        return;
+                    }
+                    r.active = !r.active;
+                    if (r.active) {
+                        const usedColors = records.filter(record => record !== r && record.active).map(record => record.color);
+                        if (usedColors.includes(color)) color = colors.find(candidate => !usedColors.includes(candidate));
+                        r.color = color;
+                    }
+                    btn.setAttribute('aria-pressed', String(r.active));
+                    btn.classList.toggle('disabled', !r.active);
+                    if (r.active) {
+                        btn.style.borderColor = color;
+                        btn.style.color = color;
+                    } else {
+                        btn.style.borderColor = '';
+                        btn.style.color = '';
+                    }
+                    updateCharts();
+                });
+                toggleContainer.appendChild(btn);
+            });
+        }
+
+        const radarMetricLabels = {
+            id: 'radarMetricLabels',
+            afterLayout(chart) {
+                document.querySelectorAll('#radar-metric-labels [data-axis]').forEach(label => {
+                    const box = chart.scales.r.getPointLabelPosition(Number(label.dataset.axis));
+                    label.style.left = ((box.left + box.right) / 2) + 'px';
+                    label.style.top = ((box.top + box.bottom) / 2) + 'px';
+                });
+            }
+        };
+        let radarChart = null;
+        const countFormatter = new Intl.NumberFormat('en-US');
+        const countValueLabels = {
+            id: 'countValueLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx, scales: { x } } = chart;
+                ctx.save();
+                if (chart.data.datasets.length) {
+                    chart.data.labels.forEach((label, row) => {
+                        const bars = chart.data.datasets.map((_, index) => chart.getDatasetMeta(index).data[row]);
+                        const top = Math.min(...bars.map(bar => bar.y - bar.height / 2));
+                        const headingBaseline = top - 14;
+                        if (row > 0) {
+                            ctx.strokeStyle = '#f1f5f9';
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.moveTo(chart.chartArea.left, headingBaseline - 20);
+                            ctx.lineTo(chart.width - 24, headingBaseline - 20);
+                            ctx.stroke();
+                        }
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'alphabetic';
+                        ctx.fillStyle = '#475569';
+                        ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+                        ctx.fillText(label, chart.chartArea.left, headingBaseline);
+                        const symbolLeft = chart.chartArea.left + ctx.measureText(label).width + 10;
+                        ctx.fillStyle = '#64748b';
+                        ctx.font = '11px ui-monospace, monospace';
+                        ctx.fillText(chart.data.datasets[0]._symbols[row], symbolLeft, headingBaseline);
+                    });
+                }
+                ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+                ctx.fillStyle = '#475569';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                chart.data.datasets.forEach((dataset, index) => {
+                    chart.getDatasetMeta(index).data.forEach((bar, row) => {
+                        const value = dataset._raw[row];
+                        ctx.fillText(value === null ? 'n/a' : countFormatter.format(value), x.getPixelForValue(value > 0 ? value : x.min) + 7, bar.y);
+                    });
+                });
+                ctx.restore();
+            }
+        };
+
+        function updateCharts() {
+            hideChartValues();
+            const activeRecords = records.filter(r => r.active);
+            document.getElementById("radar-empty").hidden = activeRecords.length > 0;
+            document.getElementById("inputs-empty").hidden = activeRecords.length > 0;
+            document.getElementById("input-charts-grid").hidden = activeRecords.length === 0;
+            document.getElementById("radar-metric-labels").hidden = activeRecords.length === 0;
+            const inputLegend = document.getElementById('comparison-input-legend');
+            inputLegend.replaceChildren();
+            activeRecords.forEach(record => {
+                const label = document.createElement('span');
+                label.style.overflowWrap = 'anywhere';
+                const swatch = document.createElement('span');
+                swatch.textContent = '● ';
+                swatch.style.color = record.color;
+                swatch.setAttribute('aria-hidden', 'true');
+                label.append(swatch, document.createTextNode(record.name));
+                inputLegend.appendChild(label);
+            });
+            if (!activeRecords.length) inputLegend.textContent = 'No applications selected. Use Show above to select an application.';
+            if (selectionStatus) {
+                selectionStatus.textContent = `${activeRecords.length} of ${records.length} applications shown. Compare up to ${comparisonLimit} at once; hide one to select another. All applications remain in the report below.`;
+            }
+            const radarDatasets = activeRecords.map(r => {
+                const color = r.color;
+                return {
+                    label: r.name,
+                    data: r.metricsNormalized,
+                    _raw: r.metricsRaw,
+                    backgroundColor: color + '26',
+                    borderColor: color,
+                    borderWidth: 2,
+                    pointBackgroundColor: color,
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    fill: true
+                };
+            });
+
+            if (radarChart) {
+                radarChart.data.datasets = radarDatasets;
+                radarChart.update();
+            } else {
+                const radarCanvas = document.getElementById('global-radar-chart');
+                if (radarCanvas) {
+                    radarChart = new Chart(radarCanvas, {
+                        type: 'radar',
+                        plugins: [radarMetricLabels],
+                        data: { labels: metricOrder, datasets: radarDatasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                r: {
+                                    beginAtZero: true,
+                                    max: 1,
+                                    ticks: { display: false },
+                                    pointLabels: { callback: label => label + '   ⓘ', font: { size: 12, weight: '600' }, color: 'transparent', padding: 12 },
+                                    grid: { color: '#e2e8f0' },
+                                    angleLines: { color: '#e2e8f0' }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                datalabels: { display: false },
+                                tooltip: { enabled: false, mode: 'nearest', intersect: true, external: chartTooltip('metrics') }
+                            }
+                        }
+                    });
+                }
+            }
+
+            updateInputCharts(activeRecords);
+        }
+
+        function updateInputCharts(activeRecords = records.filter(record => record.active)) {
+            const countBarHeight = Math.max(14, activeRecords.length * 14);
+            const countRowHeight = countBarHeight + 48;
+            const maxCount = activeRecords.reduce((max, record) => Math.max(max, ...record.counts), 1);
+            const countAxisMax = 10 ** Math.max(0, Math.ceil(Math.log10(maxCount)));
+
+            inputGroups.forEach(group => {
+                if (group.tabId !== activeInputGroup || !activeRecords.length) return;
+                group.container.style.height = `${group.indices.length * countRowHeight + 62}px`;
+                const barDatasets = activeRecords.map(r => {
+                    const color = r.color;
+                    return {
+                        label: r.name,
+                        data: group.indices.map(index => r.counts[index] > 0 ? r.counts[index] : null),
+                        _raw: group.indices.map(index => r.counts[index]),
+                        _symbols: group.indices.map(index => r.countSymbols[index]),
+                        backgroundColor: color + 'cc',
+                        hoverBackgroundColor: color,
+                        borderRadius: 3,
+                        borderSkipped: false,
+                        categoryPercentage: countBarHeight / countRowHeight,
+                        barPercentage: 0.82,
+                        maxBarThickness: 11
+                    };
+                });
+
+                if (group.chart) {
+                    group.chart.data.datasets = barDatasets;
+                    group.chart.options.scales.x.max = countAxisMax;
+                    group.chart.resize();
+                    group.chart.update();
+                } else {
+                    const barCanvas = document.getElementById('input-chart-' + group.id);
+                    if (barCanvas) {
+                        group.chart = new Chart(barCanvas, {
+                            type: 'bar',
+                            plugins: [countValueLabels],
+                            data: { labels: group.indices.map(index => records[0].countLabels[index]), datasets: barDatasets },
+                            options: {
+                                indexAxis: 'y',
+                                animation: false,
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                layout: { padding: { top: 16, right: 65, bottom: 8, left: 12 } },
+                                plugins: {
+                                    legend: { display: false },
+                                    datalabels: { display: false },
+                                    tooltip: { enabled: false, mode: 'index', axis: 'y', intersect: false, external: chartTooltip('counts') }
+                                },
+                                scales: {
+                                    x: {
+                                        type: 'logarithmic',
+                                        min: 0.1,
+                                        max: countAxisMax,
+                                        afterBuildTicks: scale => {
+                                            scale.ticks = [];
+                                            for (let power = -1; power <= Math.round(Math.log10(scale.max)); power++) {
+                                                scale.ticks.push({ value: 10 ** power, major: true });
+                                            }
+                                        },
+                                        ticks: { callback: value => value < 1 ? String(value) : formatCompact(value), maxRotation: 0, maxTicksLimit: 5 },
+                                        title: { display: true, text: 'Count' },
+                                        grid: { drawOnChartArea: false, color: '#e2e8f0' },
+                                        border: { color: '#e2e8f0' }
+                                    },
+                                    y: { display: false }
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        updateCharts();
+    }
+
+    // ------------------------------------------------------------------
+
+});
+</script>
+
+<!-- JSON export -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const rawRecords = [{"analysis_scope": "artifact", "apk_path": "illustrative-notes.apk", "apk_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "counts": {"activity_aliases": 0, "async_callsites": 160, "callsites_framework_android_androidx": 1800, "callsites_total": 4000, "classes_analyzed_total": 240, "components_total_for_cd_ll": 12, "fragment_classes": 4, "icc_callsites": 16, "icc_components_for_ic": 8, "lifecycle_callbacks": 30, "manifest_components": 8, "resource_callsites": 80, "ui_classes": 10, "ui_nonui_callsites": 45}, "evidence": {"activity_aliases": [], "fragment_classes": [], "manifest_components": [{"dalvik_name": "Lorg/example/notes/MainActivity;", "name": "org.example.notes.MainActivity", "type": "activity"}], "ui_classes": ["Lorg/example/notes/MainActivity;"]}, "metrics": {"AB": 0.04, "CD": 0.05, "FC": 0.45, "IC": 2.0, "LL": 2.5, "PD": 0.02, "UE": 4.5}, "package": "org.example.notes", "provenance": {"analysis_scope": "artifact", "androguard_version": "illustrative; no APK analyzed", "callsite_definition": "Dalvik invoke instructions in analyzed methods", "framework_definition": "target class starts with Landroid/ or Landroidx/", "mosaic_version": "0.4.0", "run_timestamp": "illustrative; no analysis run", "scope_definition": "all DEX-defined classes", "taxonomy_version": "illustrative"}, "sdk": {"min": "23", "target": "35"}, "version_code": "1"}, {"analysis_scope": "artifact", "apk_path": "illustrative-tasks.apk", "apk_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "counts": {"activity_aliases": 0, "async_callsites": 420, "callsites_framework_android_androidx": 3300, "callsites_total": 6000, "classes_analyzed_total": 360, "components_total_for_cd_ll": 18, "fragment_classes": 6, "icc_callsites": 36, "icc_components_for_ic": 12, "lifecycle_callbacks": 54, "manifest_components": 12, "resource_callsites": 180, "ui_classes": 14, "ui_nonui_callsites": 84}, "evidence": {"activity_aliases": [], "fragment_classes": [], "manifest_components": [{"dalvik_name": "Lorg/example/tasks/MainActivity;", "name": "org.example.tasks.MainActivity", "type": "activity"}], "ui_classes": ["Lorg/example/tasks/MainActivity;"]}, "metrics": {"AB": 0.07, "CD": 0.05, "FC": 0.55, "IC": 3.0, "LL": 3.0, "PD": 0.03, "UE": 6.0}, "package": "org.example.tasks", "provenance": {"analysis_scope": "artifact", "androguard_version": "illustrative; no APK analyzed", "callsite_definition": "Dalvik invoke instructions in analyzed methods", "framework_definition": "target class starts with Landroid/ or Landroidx/", "mosaic_version": "0.4.0", "run_timestamp": "illustrative; no analysis run", "scope_definition": "all DEX-defined classes", "taxonomy_version": "illustrative"}, "sdk": {"min": "23", "target": "35"}, "version_code": "1"}];
+    document.querySelectorAll('.export-json').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const index = parseInt(btn.getAttribute('data-index'), 10);
+            const payload = rawRecords.find((_, i) => (i + 1) === index) || rawRecords[index - 1];
+            if (!payload) return;
+
+            const rawName = payload.apk_name || payload.apk_path || ('mosaic-report-' + index);
+            const base = String(rawName).split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/\.apk$/i, '');
+            const filename = base + '.json';
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+    });
+});
+</script>
+
+</body>
+</html>
