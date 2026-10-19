@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOSAIC Analysis Report</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        details > summary::-webkit-details-marker { display: none; }
+        .evidence-item { white-space: normal; overflow-wrap: anywhere; word-break: normal; }
+        .evidence-item.expandable { cursor: pointer; }
+        .evidence-item.expandable:hover { color: #4f46e5; background: #eef2ff; border-radius: 4px; }
+        .evidence-item.truncated {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            display: block;
+        }
+        .dataset-toggle { transition: all 0.2s; }
+        .dataset-toggle { min-width: 0; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+        .comparison-controls { min-width: 0; }
+        .comparison-controls > span { flex-shrink: 0; padding-top: 8px; }
+        #chart-toggles { min-width: 0; }
+        .comparison-grid > div { min-width: 0; }
+        .comparison-scroll { overflow-x: auto; }
+        .comparison-scroll:focus-visible { outline: 2px solid #6366f1; outline-offset: 4px; }
+        .comparison-large .comparison-heading { flex-direction: column; align-items: stretch; }
+        .comparison-large .comparison-controls { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+        .comparison-large #chart-toggles { max-height: 180px; overflow-y: auto; padding: 2px; }
+        .comparison-grid { grid-template-columns: minmax(0, 1fr); align-items: start; }
+        .comparison-profile { display: flex; flex-direction: column; }
+        .comparison-profile .radar-container { flex-shrink: 0; margin-block: auto; }
+        @media (min-width: 1100px) {
+            .comparison-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); align-items: stretch; }
+        }
+        .radar-container { max-width: 720px; margin-inline: auto; }
+        .input-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; }
+        .input-tab { padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; color: #475569; font-size: 14px; font-weight: 600; }
+        .input-tab:hover { background: #f8fafc; }
+        .input-tab[aria-selected="true"] { color: #4338ca; border-color: #818cf8; background: #eef2ff; }
+        .input-chart-card { min-width: 0; padding: 12px 0; }
+        .input-chart-card + .input-chart-card { border-top: 1px solid #e2e8f0; margin-top: 16px; padding-top: 24px; }
+        .input-chart-heading { margin: 0 12px 12px; font-size: 14px; font-weight: 600; color: #334155; }
+        .input-tab-panel[hidden], #input-charts-grid[hidden] { display: none; }
+        .dataset-toggle.disabled {
+            opacity: 0.4;
+            filter: grayscale(100%);
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #64748b;
+        }
+        .metric-row:hover .metric-formula { opacity: 1; }
+        .metric-help { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; vertical-align: middle; color: #64748b; cursor: help; border-radius: 6px; flex-shrink: 0; }
+        .metric-help span { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border: 1px solid currentColor; border-radius: 50%; font: 600 10px/1 Georgia, serif; }
+        .metric-help:focus-visible { outline: 2px solid #c7d2fe; outline-offset: 2px; }
+        #metric-popover { position: fixed; z-index: 100; display: flex; flex-direction: column; width: 360px; max-width: calc(100vw - 24px); max-height: min(480px, calc(100vh - 24px)); overflow: hidden; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px #0f172a26; color: #334155; font-size: 13px; line-height: 1.5; }
+        #metric-popover[hidden] { display: none; }
+        #metric-popover h3 { flex-shrink: 0; font-weight: 600; color: #0f172a; padding: 14px 42px 12px 18px; border-bottom: 1px solid #e2e8f0; }
+        #metric-help-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; padding: 14px 18px 18px; }
+        #metric-help-body:focus-visible { outline: 2px solid #c7d2fe; outline-offset: -3px; }
+        #metric-popover p + p { margin-top: 10px; }
+        #metric-help-formula { font-family: monospace; color: #4f46e5; }
+        .metric-calculation { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+        .metric-calculation h4 { font-weight: 600; color: #0f172a; overflow-wrap: anywhere; margin-bottom: 8px; }
+        .metric-calculation dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+        .metric-calculation dd { font-family: monospace; text-align: right; }
+        .metric-calculation-result { margin-top: 8px; font-family: monospace; color: #4f46e5; overflow-wrap: anywhere; }
+        #metric-help-close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 6px; }
+        #metric-help-close:hover { background: #f1f5f9; }
+        #single-metric-labels { position: absolute; inset: 0; pointer-events: none; }
+        .single-metric-label { position: absolute; left: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: 11px; line-height: 1.3; text-align: right; color: #475569; }
+        .single-metric-label .metric-help { pointer-events: auto; }
+        .single-metric-value { position: absolute; transform: translateY(-50%); white-space: nowrap; font: 11px/1.3 ui-monospace, monospace; color: #475569; }
+        .radar-metric-labels { position: absolute; inset: 0; pointer-events: none; }
+        .radar-metric-label { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; white-space: nowrap; font-size: 12px; font-weight: 600; color: #475569; }
+        .radar-metric-label .metric-help { pointer-events: auto; }
+        @media print { #metric-popover { display: none; } }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: #fff !important; }
+            .shadow-sm { box-shadow: none !important; }
+            .print-break { break-before: page; }
+        }
+
+        .help-guidance { font-size: 12px; line-height: 1.5; color: #64748b; }
+        .notation-label { display: inline-block; margin-left: 6px; font: 400 11px/1.5 ui-monospace, monospace; color: #64748b; vertical-align: baseline; }
+        .font-mono, td, dd { font-variant-numeric: tabular-nums; }
+        article h3, article p, td:first-child, .metric-row .min-w-0 { overflow-wrap: anywhere; }
+        td:first-child { white-space: normal; min-width: 180px; }
+        .metric-row .min-w-0 > .flex { flex-wrap: wrap; }
+        .metadata-summary { display: inline-flex; align-items: center; gap: 12px; padding: 6px 0; cursor: pointer; font-weight: 500; color: #475569; }
+        .disclosure-arrow { width: 16px; height: 16px; flex-shrink: 0; transition: transform .2s; }
+        details[open] > summary .disclosure-arrow { transform: rotate(180deg); }
+        button:focus-visible, summary:focus-visible, canvas:focus-visible, .evidence-item:focus-visible { outline: 2px solid #6366f1; outline-offset: 3px; }
+        #chart-value-popover { position: fixed; z-index: 90; width: 360px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); overflow: auto; background: white; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 12px 32px #0f172a26; color: #334155; font-size: 13px; line-height: 1.5; pointer-events: none; }
+        #chart-value-popover.pinned { pointer-events: auto; }
+        #chart-value-popover h3 { padding: 14px 42px 12px 18px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0f172a; }
+        #chart-value-popover button { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 6px; }
+        #chart-value-popover button:hover { background: #f1f5f9; }
+        .chart-value-rows { padding: 12px 18px; display: grid; gap: 10px; }
+        .chart-value-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; }
+        .chart-value-name { overflow-wrap: anywhere; }
+        .chart-value-number { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; color: #4338ca; }
+        .chart-value-swatch { width: 8px; height: 8px; border-radius: 50%; }
+        .chart-empty { z-index: 2; position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #64748b; font-size: 13px; background: #fff; }
+        .chart-empty[hidden] { display: none; }
+        @media print { #chart-value-popover, .help-guidance { display: none !important; } }
+    </style>
+</head>
+{% macro metric_help(mid, record_index=none) -%}
+<button type="button" class="metric-help" data-metric="{{ mid }}"{% if record_index is not none %} data-record-index="{{ record_index }}"{% endif %} aria-label="About {{ mid }}: {{ metric_info[mid].name }}" aria-expanded="false" aria-controls="metric-popover"><span aria-hidden="true">i</span></button>
+{%- endmacro %}
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen pb-12">
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+
+    <!-- ================================================================ -->
+    <!-- HEADER                                                           -->
+    <!-- ================================================================ -->
+    <header class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">MOSAIC Analysis Report</h1>
+            </div>
+
+            <p class="text-sm text-slate-500 mt-2 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>Generated {{ meta.run_timestamp }}</span>
+                <span class="text-slate-300">|</span>
+                <span>MOSAIC v{{ meta.mosaic_version }}</span>
+            </p>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            <div class="bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 text-center min-w-20">
+                <div class="text-[10px] font-bold text-slate-500 uppercase">Total</div>
+                <div class="text-xl font-bold text-slate-800">{{ stats.total }}</div>
+            </div>
+            <div class="bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100 text-center min-w-20">
+                <div class="text-[10px] font-bold text-emerald-600 uppercase">Success</div>
+                <div class="text-xl font-bold text-emerald-700">{{ stats.ok }}</div>
+            </div>
+            <div class="bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 text-center min-w-20">
+                <div class="text-[10px] font-bold text-slate-500 uppercase">Failed</div>
+                <div class="text-xl font-bold text-slate-700">{{ stats.failed }}</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================================================================ -->
+    <!-- SINGLE-APP OVERVIEW                                               -->
+    <!-- ================================================================ -->
+    {% if stats.ok == 1 and stats.total == 1 %}
+        {% for record in records if not record.is_error %}
+        <section class="space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Application Overview</h2>
+                    <p class="text-sm text-slate-500 mt-1">Structural overview of the application.</p>
+                    <p class="help-guidance mt-2">Hover or tap ⓘ for definitions and calculations.</p>
+                </div>
+                <button type="button"
+                        class="export-json no-print inline-flex items-center justify-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-slate-200 hover:border-indigo-300 text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors"
+                        data-index="{{ record.index }}"
+                        title="Export this application's complete MOSAIC result as JSON">
+                    Export JSON
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div class="xl:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Application Identity</h3>
+                    <dl class="space-y-4 text-sm">
+                        <div>
+                            <dt class="text-xs text-slate-500">APK</dt>
+                            <dd class="font-semibold text-slate-900 break-all">{{ record.apk_name }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-slate-500">Package</dt>
+                            <dd class="font-mono text-xs text-slate-700 break-all">{{ record.package }}</dd>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <dt class="text-xs text-slate-500">Min SDK</dt>
+                                <dd class="font-mono font-semibold text-slate-900">{{ record.sdk_min }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-slate-500">Target SDK</dt>
+                                <dd class="font-mono font-semibold text-slate-900">{{ record.sdk_target }}</dd>
+                            </div>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-slate-500">Analysis scope: {{ record.scope.label }}</dt>
+                            <dd class="text-xs text-slate-500 mt-1">{{ record.scope.note }}</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div class="xl:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex items-start justify-between gap-4 mb-3">
+                        <div>
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Structural Metric Profile</h3>
+                        </div>
+                    </div>
+                    <div class="relative w-full h-[330px]">
+                        <canvas id="single-profile-chart" role="img" aria-label="Single application metrics on a logarithmic axis"></canvas>
+                        <div id="single-metric-labels" aria-label="Metric names and values">
+                            {% for mid in metric_order %}
+                            <div class="single-metric-label" data-axis="{{ loop.index0 }}"><span>{{ metric_info[mid].name }} <span class="text-slate-400">{{ mid }}</span></span>{{ metric_help(mid, record.index) }}</div>
+                            <span class="single-metric-value" data-value="{{ loop.index0 }}"></span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% endfor %}
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- MULTI-APP COMPARISON DASHBOARD                                   -->
+    <!-- ================================================================ -->
+    {% if stats.ok > 1 %}
+    <section id="application-comparison" class="space-y-6{% if stats.ok > 3 %} comparison-large{% endif %}">
+        <div class="comparison-heading flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-bold text-slate-800">Application Comparison</h2>
+                <p class="text-sm text-slate-500 mt-1">Compare MOSAIC metric profiles across successfully analyzed applications.</p>
+                    <p class="help-guidance mt-2">Hover or tap ⓘ for definitions and calculations.</p>
+            </div>
+            <div class="comparison-controls flex items-start gap-2 text-sm no-print">
+                <span id="chart-toggles-label" class="text-slate-500 font-medium text-xs uppercase tracking-wider">Show in Charts:</span>
+                <div id="chart-toggles" class="flex flex-wrap gap-2" role="group" aria-labelledby="chart-toggles-label"></div>
+            </div>
+            {% if stats.ok > 6 %}<p id="comparison-selection-status" class="text-xs text-slate-500 no-print" role="status" aria-live="polite"></p>{% endif %}
+        </div>
+
+        <div class="comparison-grid grid gap-6">
+            <!-- Relative profile -->
+            <div class="comparison-profile bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider text-center mb-4">Structural Metric Profile</h3>
+                <div class="radar-container relative w-full h-[350px]">
+                    <p id="radar-empty" class="chart-empty" hidden>No applications selected. Select an application above.</p>
+                    <canvas id="global-radar-chart" role="img" aria-label="Relative metric profiles; exact values are in the Metric Summary table."></canvas>
+                    <div id="radar-metric-labels" class="radar-metric-labels" aria-label="Spider chart metric definitions">
+                        {% for mid in metric_order %}<span class="radar-metric-label" data-axis="{{ loop.index0 }}">{{ mid }} {{ metric_help(mid) }}</span>{% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inputs -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider text-center mb-4">Metric Inputs</h3>
+                <div class="input-tabs" role="tablist" aria-label="Metric input groups">
+                    {% for group in count_groups %}
+                    <button type="button" id="input-tab-{{ group.id }}" class="input-tab" role="tab" aria-controls="input-panel-{{ group.id }}" aria-selected="{{ 'true' if loop.first else 'false' }}" tabindex="{{ 0 if loop.first else -1 }}" data-input-group="{{ group.id }}">{{ group.title }}</button>
+                    {% endfor %}
+                </div>
+                <div id="comparison-input-legend" class="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs mb-4" aria-label="Applications shown in the input charts"></div>
+                <p id="inputs-empty" class="text-sm text-slate-500 text-center py-8" hidden>No applications selected. Select an application above.</p>
+                <div id="input-charts-grid">
+                    {% for group in count_groups %}
+                    <div id="input-panel-{{ group.id }}" class="input-tab-panel" role="tabpanel" aria-labelledby="input-tab-{{ group.id }}"{% if not loop.first %} hidden{% endif %}>
+                        {% for section in group.sections %}
+                        <section class="input-chart-card" aria-labelledby="input-heading-{{ section.id }}">
+                            <h4 id="input-heading-{{ section.id }}" class="{{ 'sr-only' if section.title == 'Metric inputs' else 'input-chart-heading' }}">{{ section.title }}</h4>
+                            <div class="comparison-scroll" tabindex="0" role="region" aria-labelledby="input-heading-{{ section.id }}">
+                                <div id="input-container-{{ section.id }}" class="relative w-full" style="min-width: 480px; height: 350px">
+                                    <canvas id="input-chart-{{ section.id }}" role="img" aria-label="{{ group.title }} — {{ section.title }}: input counts by application"></canvas>
+                                </div>
+                            </div>
+                        </section>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {% if scope_mismatch or scope_unknown %}
+        <div class="border-l-4 border-amber-400 bg-amber-50 px-5 py-4 text-sm text-amber-900" role="note">
+            {% if scope_mismatch %}<strong>Different analysis scopes.</strong> Values use different code boundaries; differences may reflect scope selection as well as application structure.
+            {% else %}<strong>Analysis scope is unknown.</strong> Verify the code boundaries before interpreting this comparison.{% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Metric summary -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div>
+                    <h3 class="font-semibold text-slate-900">Metric Summary</h3>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                    <tr>
+                        <th class="px-5 py-3 font-semibold">APK / Package / Scope</th>
+                        {% for mid in metric_order %}
+                        <th class="px-3 py-3 font-semibold text-right" >{{ mid }} {{ metric_help(mid) }}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                    {% set summary_position = namespace(value=0) %}
+                    {% for row in summary_rows %}
+                    {% if not row.error %}{% set summary_position.value = summary_position.value + 1 %}{% endif %}
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-5 py-4">
+                            <div class="font-medium text-slate-900">{% if stats.ok == 2 and not row.error %}{{ "A: " if summary_position.value == 1 else "B: " }}{% endif %}{{ row.name }}</div>
+                            {% if not row.error %}
+                            <div class="text-xs text-slate-500 font-mono mt-1">{{ row.package }}</div>
+                            <div class="text-xs text-slate-500 mt-1" title="{{ row.scope.note }}">Scope: {{ row.scope.label }}</div>
+                            {% endif %}
+                        </td>
+                        {% if row.error %}
+                        <td colspan="{{ metric_order|length }}" class="px-3 py-4 text-slate-600 text-xs italic">{{ row.error_message }}</td>
+                        {% else %}
+                            {% for val in row.metric_values %}
+                            <td class="px-3 py-4 font-mono text-xs text-right text-slate-600">{{ val }}</td>
+                            {% endfor %}
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Dedicated two-app delta -->
+        {% if stats.ok == 2 %}
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100">
+                <h3 class="font-semibold text-slate-900">Two-App Metric Differences</h3>
+                <p class="text-xs text-slate-500 mt-1 break-words">A: {{ comparison_names[0] }}<br>B: {{ comparison_names[1] }}</p>
+                <p class="text-xs text-slate-500 mt-1">Difference = B − A. Relative difference uses A as the baseline.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                        <tr>
+                            <th class="px-5 py-3 text-left font-semibold">Metric</th>
+
+                            <th class="px-4 py-3 text-right font-semibold">Δ</th>
+                            <th class="px-5 py-3 text-right font-semibold">Relative Δ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="delta-table-body" class="divide-y divide-slate-100">
+                        {% for metric in differences %}
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-5 py-3">
+                                <div class="font-semibold text-slate-800">{{ metric.name }} <span class="notation-label">{{ metric.id }}</span> {{ metric_help(metric.id) }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono mt-1">A {{ metric.a }} → B {{ metric.b }}</div>
+                            </td>
+                            <td class="px-4 py-3 text-right font-mono text-sm text-slate-900">{{ metric.delta }}</td>
+                            <td class="px-5 py-3 text-right font-mono text-xs text-slate-600">{{ metric.relative }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- FAILED ANALYSES                                                   -->
+    <!-- ================================================================ -->
+    {% if stats.failed > 0 %}
+    <section class="space-y-4">
+        <h2 class="text-xl font-bold text-slate-800">Failed Analyses</h2>
+        {% for record in records if record.is_error %}
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
+                <div>
+                    <h3 class="font-semibold text-slate-900">{{ record.apk_name }}</h3>
+                    <p class="text-xs text-slate-600 mt-1">{{ record.error }}</p>
+                </div>
+            </div>
+            {% if record.traceback %}
+            <pre class="m-5 text-[11px] text-slate-600 bg-slate-50 p-4 rounded border border-slate-200 font-mono overflow-x-auto">{{ record.traceback }}</pre>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- DETAILED APP ANALYSIS                                             -->
+    <!-- ================================================================ -->
+    {% if stats.ok > 0 %}
+    <section class="space-y-6">
+        <div>
+            <h2 class="text-xl font-bold text-slate-800">Application Details</h2>
+            <p class="text-sm text-slate-500 mt-1">Metric values, calculation inputs, and supporting extracted evidence.</p>
+        </div>
+
+        <div class="space-y-8">
+            {% for record in records if not record.is_error %}
+            <article class="bg-white rounded-2xl shadow-sm border border-slate-200" id="apk-{{ record.index }}">
+                <!-- App heading -->
+                <div class="bg-slate-50 border-b border-slate-200 px-6 py-5 rounded-t-2xl">
+                    <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div>
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <h3 class="text-lg font-bold text-slate-900">{% if stats.ok == 2 %}{{ "A: " if loop.index == 1 else "B: " }}{% endif %}{{ record.apk_name }}</h3>
+                            </div>
+                            {% if stats.ok > 1 or stats.total > 1 %}
+                            <p class="text-sm text-slate-600 mt-2 font-medium">
+                                {{ record.package }}
+                                <span class="text-slate-300 mx-2">|</span>
+                                Min SDK:
+                                <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">{{ record.sdk_min }}</span>
+                                <span class="ml-2">Target SDK:</span>
+                                <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">{{ record.sdk_target }}</span>
+                            </p>
+                            <p class="text-xs text-slate-600 mt-3"><strong>Analysis scope: {{ record.scope.label }}</strong> — {{ record.scope.note }}</p>
+                            {% endif %}
+                            <details class="mt-3 text-xs text-slate-500">
+                                <summary class="metadata-summary"><span>Source metadata</span><svg class="disclosure-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></summary>
+                                <p class="mt-2">Recorded scope: {{ record.scope.definition }}</p>
+                                <p class="mt-2">Version code: {{ record.version_code }}</p>
+                                <p class="mt-2">Taxonomy: {{ record.provenance.taxonomy_version }}</p>
+                                <p class="mt-2">Callsites: {{ record.provenance.callsite_definition }}</p>
+                                <p class="mt-2">Framework: {{ record.provenance.framework_definition }}</p>
+                            <p class="text-[11px] text-slate-400 mt-2 font-mono break-all">APK: {{ record.apk_path }}</p>
+                            <p class="text-[11px] text-slate-400 mt-2 font-mono break-all">SHA256: {{ record.sha256 or 'Unknown' }}</p>
+                            </details>
+                        </div>
+
+                        {% if stats.ok > 1 or stats.total > 1 %}
+                        <button type="button"
+                                class="export-json no-print shrink-0 inline-flex items-center justify-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 border border-slate-200 hover:border-indigo-300 text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors"
+                                data-index="{{ record.index }}"
+                                title="Export this application's complete MOSAIC result as JSON">
+                            Export JSON
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="p-6 space-y-8">
+                    <!-- Metrics + inputs -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-slate-100 pb-2">
+                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Metric Values</h4>
+                                <span class="help-guidance">Hover or tap ⓘ for definitions and calculations.</span>
+                            </div>
+
+                            <ul class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm">
+                                {% for metric in record.metrics %}
+                                <li class="metric-row px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-slate-700">{{ metric.name }}</span>
+                                                <span class="notation-label">{{ metric.id }}</span>
+                                                {{ metric_help(metric.id, record.index) }}
+                                            </div>
+
+                                            {% if metric.formula_display or metric.calculation_display %}
+                                            <div class="metric-formula text-[11px] text-slate-400 mt-1 font-mono">
+                                                {% if metric.formula_display %}{{ metric.formula_display }}{% endif %}
+                                                {% if metric.formula_display and metric.calculation_display %}<span class="mx-1">•</span>{% endif %}
+                                                {% if metric.calculation_display %}{{ metric.calculation_display }}{% endif %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md text-sm shrink-0">{{ metric.value }}</span>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">Metric Inputs</h4>
+                            <ul class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm">
+                                {% for c in record.counts %}
+                                <li class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                                        <span>{{ c.label }}{% if c.symbols %}<span class="notation-label">{{ c.symbols | join(', ') }}</span>{% endif %}</span>
+                                    </span>
+                                    <span class="font-mono font-semibold text-slate-900 text-sm" data-count="{{ c.value }}">{{ c.value }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Evidence -->
+                    <details class="group bg-slate-50 rounded-xl border border-slate-200">
+                        <summary class="flex justify-between items-center font-medium cursor-pointer text-sm text-slate-700 p-4 hover:bg-slate-100 transition-colors rounded-xl select-none">
+                            <span>Supporting Evidence</span>
+                            <svg class="disclosure-arrow text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+                        </summary>
+
+                        <div class="p-6 border-t border-slate-200 bg-white rounded-b-xl overflow-hidden">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {% for evidence_key, evidence_title in [('manifest_components', 'Manifest Components'), ('activity_aliases', 'Activity Aliases'), ('fragment_classes', 'Fragment Classes'), ('ui_classes', 'UI Classes')] %}
+                                <div class="flex flex-col">
+                                    <h5 class="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wide flex justify-between items-center gap-2">
+                                        <span>{{ evidence_title }}</span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{{ record.evidence[evidence_key]|length }}</span>
+                                            <button type="button"
+                                                    class="evidence-toggle-expand all no-print text-xs font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                                    data-key="{{ evidence_key }}"
+                                                    onclick="event.stopPropagation()">Expand All</button>
+                                        </span>
+                                    </h5>
+                                    <ul class="max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs text-slate-600 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        {% for item in record.evidence[evidence_key] %}
+                                        <li class="evidence-item truncated p-0.5">
+                                            {% if item is mapping %}
+                                                {{ item.name }}{% if item.type %} <span class="text-slate-400">({{ item.type }})</span>{% endif %}
+                                                {% if item.dalvik_name %}<div>{{ item.dalvik_name }}</div>{% endif %}
+                                                {% if item.target_activity %}<div>Target: {{ item.target_activity }}</div>{% endif %}
+                                                {% if item.target_dalvik_name %}<div>{{ item.target_dalvik_name }}</div>{% endif %}
+                                            {% else %}
+                                                {{ item }}
+                                            {% endif %}
+                                        </li>
+                                        {% else %}
+                                        <li class="text-slate-400 italic">None detected</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="mt-4 text-[11px] text-slate-400 leading-relaxed">
+                                Evidence follows the selected {{ record.scope.label }} scope. Framework callsites count calls targeting android.* / androidx.* APIs; other library targets are excluded from that numerator.
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- ================================================================ -->
+</div>
+
+<div id="metric-popover" role="dialog" aria-modal="false" aria-labelledby="metric-help-title" hidden>
+    <button type="button" id="metric-help-close" aria-label="Close metric information">×</button>
+    <h3 id="metric-help-title"></h3>
+    <div id="metric-help-body" tabindex="0" role="region" aria-label="Metric explanation and application calculations">
+    <p id="metric-help-description"></p>
+    <p id="metric-help-formula"></p>
+    <div id="metric-help-calculations"></div>
+    </div>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const metricInfo = {{ metric_info | tojson }};
+    function appendNotation(element, notation) {
+        if (!notation) return;
+        const label = document.createElement('span');
+        label.className = 'notation-label';
+        label.textContent = notation;
+        element.append(label);
+    }
+    document.querySelectorAll('[data-count]').forEach(label => {
+        const value = Number(label.dataset.count);
+        if (Number.isFinite(value)) label.textContent = new Intl.NumberFormat('en-US').format(value);
+    });
+    const calculationRecords = [
+        {% for record in records if not record.is_error %}
+        {
+            index: {{ record.index }},
+            name: {{ ((('A: ' if loop.index == 1 else 'B: ') if stats.ok == 2 else '') ~ record.apk_name ~ ' · ' ~ record.scope.label) | tojson }},
+            metrics: {
+                {% for metric in record.metrics %}
+                {{ metric.id | tojson }}: {{ metric.calculation | tojson }},
+                {% endfor %}
+            }
+        },
+        {% endfor %}
+    ];
+    const chartValues = document.createElement('div');
+    chartValues.id = 'chart-value-popover';
+    chartValues.hidden = true;
+    chartValues.setAttribute('role', 'dialog');
+    chartValues.setAttribute('aria-label', 'Chart values');
+    document.body.appendChild(chartValues);
+    let chartValuesPinned = false;
+    let valueChart = null;
+    function hideChartValues() {
+        const restoreFocus = chartValues.contains(document.activeElement);
+        chartValues.hidden = true;
+        if (restoreFocus) valueChart?.canvas.focus({ preventScroll: true });
+        chartValues.classList.remove('pinned');
+        chartValuesPinned = false;
+    }
+    const popover = document.getElementById('metric-popover');
+    const helpBody = document.getElementById('metric-help-body');
+    let helpButton = null;
+    let pinned = false;
+    let hideTimer;
+    function hideHelp() {
+        clearTimeout(hideTimer);
+        if (helpButton) helpButton.setAttribute('aria-expanded', 'false');
+        popover.hidden = true;
+        helpButton = null;
+        pinned = false;
+    }
+    function showHelp(button) {
+        clearTimeout(hideTimer);
+        if (helpButton === button && !popover.hidden) return;
+        if (helpButton && helpButton !== button) hideHelp();
+        hideChartValues();
+        helpButton = button;
+        const info = metricInfo[button.dataset.metric];
+        const helpTitle = document.getElementById('metric-help-title');
+        helpTitle.textContent = info.name;
+        appendNotation(helpTitle, button.dataset.metric);
+        document.getElementById('metric-help-description').textContent = info.description;
+        document.getElementById('metric-help-formula').textContent = 'Formula: ' + info.formula;
+        const calculations = document.getElementById('metric-help-calculations');
+        calculations.replaceChildren();
+        const selectedRecords = calculationRecords.filter(record =>
+            !button.dataset.recordIndex || record.index === Number(button.dataset.recordIndex));
+        selectedRecords.forEach(record => {
+            const calculation = record.metrics[button.dataset.metric];
+            const section = document.createElement('section');
+            section.className = 'metric-calculation';
+            const title = document.createElement('h4');
+            title.textContent = record.name;
+            const inputs = document.createElement('dl');
+            calculation.inputs.forEach(input => {
+                const label = document.createElement('dt');
+                label.textContent = input.label;
+                appendNotation(label, input.symbol);
+                const value = document.createElement('dd');
+                value.textContent = typeof input.value === 'number' ? new Intl.NumberFormat('en-US').format(input.value) : input.value;
+                inputs.append(label, value);
+            });
+            const result = document.createElement('p');
+            result.className = 'metric-calculation-result';
+            result.textContent = calculation.display;
+            section.append(title, inputs, result);
+            calculations.append(section);
+        });
+        popover.hidden = false;
+        helpBody.scrollTop = 0;
+        button.setAttribute('aria-expanded', 'true');
+        const box = button.getBoundingClientRect();
+        const width = popover.offsetWidth, height = popover.offsetHeight;
+        popover.style.left = Math.max(12, Math.min(box.left, window.innerWidth - width - 12)) + 'px';
+        const preferredTop = box.bottom + height + 20 <= window.innerHeight ? box.bottom + 8 : box.top - height - 8;
+        popover.style.top = Math.max(12, Math.min(preferredTop, window.innerHeight - height - 12)) + 'px';
+    }
+    function scheduleHide() {
+        clearTimeout(hideTimer);
+        if (!pinned) hideTimer = setTimeout(() => {
+            if (!popover.matches(':hover, :focus-within') && !helpButton?.matches(':hover')) hideHelp();
+        }, 350);
+    }
+    document.querySelectorAll('.metric-help').forEach(button => {
+        button.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch' && !pinned) showHelp(button); });
+        button.addEventListener('pointerleave', scheduleHide);
+        button.addEventListener('focus', () => { if (!pinned) showHelp(button); });
+        button.addEventListener('blur', event => { if (!popover.contains(event.relatedTarget)) scheduleHide(); });
+        button.addEventListener('click', () => {
+            if (helpButton === button && pinned) hideHelp();
+            else { showHelp(button); pinned = true; helpBody.focus({ preventScroll: true }); }
+        });
+    });
+    popover.addEventListener('pointerenter', () => clearTimeout(hideTimer));
+    popover.addEventListener('focusin', () => clearTimeout(hideTimer));
+    popover.addEventListener('pointerleave', scheduleHide);
+    popover.addEventListener('focusout', event => { if (!popover.contains(event.relatedTarget) && event.relatedTarget !== helpButton) scheduleHide(); });
+    document.getElementById('metric-help-close').addEventListener('click', () => {
+        const previous = helpButton;
+        if (previous) previous.focus();
+        hideHelp();
+    });
+    document.addEventListener('click', event => { if (!popover.contains(event.target) && !event.target.closest('.metric-help')) hideHelp(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') { const previous = helpButton; if (previous) previous.focus(); hideHelp(); } });
+    window.addEventListener('resize', hideHelp);
+    window.addEventListener('scroll', event => { if (!popover.contains(event.target)) hideHelp(); }, true);
+
+    // ------------------------------------------------------------------
+    // Evidence expand/collapse
+    // ------------------------------------------------------------------
+    function updateEvidenceToggle(column) {
+        const button = column?.querySelector('.evidence-toggle-expand.all');
+        if (!button) return;
+        const items = Array.from(column.querySelectorAll('.evidence-item'));
+        button.textContent = items.length && items.every(li => !li.classList.contains('truncated'))
+            ? 'Collapse All' : 'Expand All';
+    }
+    document.querySelectorAll('.evidence-item').forEach(li => {
+        li.classList.add('expandable');
+        li.tabIndex = 0;
+        li.setAttribute('role', 'button');
+        li.setAttribute('aria-expanded', 'false');
+        li.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); li.click(); }
+        });
+        li.addEventListener('click', () => {
+            const expanded = li.classList.contains('truncated');
+            li.setAttribute('aria-expanded', String(expanded));
+            li.classList.toggle('truncated', !expanded);
+            updateEvidenceToggle(li.closest('.flex.flex-col'));
+        });
+    });
+
+    document.querySelectorAll('.evidence-toggle-expand.all').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const column = btn.closest('.flex.flex-col');
+            const list = column ? column.querySelector('ul') : null;
+            if (!list) return;
+            const items = list.querySelectorAll('.evidence-item');
+            const isAnyCollapsed = Array.from(items).some(li => li.classList.contains('truncated'));
+            items.forEach(li => {
+                li.classList.toggle('truncated', !isAnyCollapsed);
+                li.setAttribute('aria-expanded', String(isAnyCollapsed));
+            });
+            updateEvidenceToggle(column);
+        });
+    });
+
+    // ------------------------------------------------------------------
+    // Chart data
+    // ------------------------------------------------------------------
+    if (typeof Chart === 'undefined') return;
+
+    Chart.defaults.color = '#64748b';
+    Chart.defaults.font.family = "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+    if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+    Chart.register({
+        id: 'reportKeyboardValues',
+        afterInit(chart) {
+            const canvas = chart.canvas;
+            canvas.tabIndex = 0;
+            canvas.setAttribute('aria-label', canvas.getAttribute('aria-label') + '. Use arrow keys to explore values; Escape to close.');
+            let selected = 0;
+            canvas.addEventListener('keydown', event => {
+                if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' '].includes(event.key)) return;
+                event.preventDefault();
+                const length = chart.data.labels.length;
+                if (!length || !chart.data.datasets.length) return;
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') selected = (selected + length - 1) % length;
+                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') selected = (selected + 1) % length;
+                hideChartValues();
+                chart.tooltip.setActiveElements([{ datasetIndex: 0, index: selected }], { x: chart.width / 2, y: chart.height / 2 });
+                chart.update('none');
+                if (event.key === 'Enter' || event.key === ' ') {
+                    chartValuesPinned = true;
+                    chartValues.classList.add('pinned');
+                    chartValues.querySelector('button')?.focus({ preventScroll: true });
+                }
+            });
+            canvas.addEventListener('blur', event => {
+                if (!chartValues.contains(event.relatedTarget)) hideChartValues();
+            });
+        }
+    });
+
+    const metricOrder = {{ metric_order | tojson }};
+    const metricNames = [
+        {% for mid in metric_order %}{{ metric_info[mid].name | tojson }},{% endfor %}
+    ];
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6'];
+
+    const records = [
+        {% for record in records if not record.is_error %}
+        {
+            index: {{ record.index }},
+            name: {{ ((("A: " if loop.index == 1 else "B: ") if stats.ok == 2 else "") ~ record.apk_name ~ " · " ~ record.scope.label) | tojson }},
+            packageName: {{ record.package | tojson }},
+            active: true,
+            metricsRaw: [
+                {% for mid in metric_order %}
+                    {% for m in record.metrics if m.id == mid %}Number.isFinite(Number({{ m.value | tojson }})) ? Number({{ m.value | tojson }}) : null,{% endfor %}
+                {% endfor %}
+            ],
+            counts: [{% for c in record.counts %}Number.isFinite(Number({{ c.value | tojson }})) ? Number({{ c.value | tojson }}) : null,{% endfor %}],
+            countKeys: [{% for c in record.counts %}{{ c.key | tojson }},{% endfor %}],
+            countLabels: [{% for c in record.counts %}{{ c.label | tojson }},{% endfor %}],
+            countSymbols: [{% for c in record.counts %}{{ c.symbols | join(', ') | tojson }},{% endfor %}]
+        },
+        {% endfor %}
+    ];
+
+    if (records.length === 0) return;
+
+    const globalMax = metricOrder.map((mid, idx) => Math.max(...records.map(r => r.metricsRaw[idx]), 0.0000001));
+    records.forEach(r => {
+        r.metricsNormalized = r.metricsRaw.map((val, idx) => val === null ? null : val / globalMax[idx]);
+    });
+
+    function formatCompact(value) {
+        if (!isFinite(value) || value === 0) return '0';
+        const abs = Math.abs(value);
+        if (abs >= 1e9) return (value / 1e9).toFixed(abs >= 1e10 ? 0 : 1) + 'B';
+        if (abs >= 1e6) return (value / 1e6).toFixed(abs >= 1e7 ? 0 : 1) + 'M';
+        if (abs >= 1e3) return (value / 1e3).toFixed(abs >= 1e4 ? 0 : 1) + 'k';
+        return String(Math.round(value));
+    }
+
+    function formatMetric(value) {
+        if (value === null || !isFinite(value)) return 'n/a';
+        return value.toFixed(4);
+    }
+
+    function chartTooltip(kind) {
+        return ({ chart, tooltip }) => {
+            if (chartValuesPinned) return;
+            if (!tooltip.opacity || !tooltip.dataPoints?.length) { hideChartValues(); return; }
+            hideHelp();
+            valueChart = chart;
+            const index = tooltip.dataPoints[0].dataIndex;
+            const heading = document.createElement('h3');
+            heading.textContent = kind === 'counts' ? chart.data.labels[index] : metricNames[index];
+            appendNotation(heading, kind === 'counts' ? chart.data.datasets[0]._symbols[index] : metricOrder[index]);
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.textContent = '×';
+            close.setAttribute('aria-label', 'Close chart values');
+            close.addEventListener('click', hideChartValues);
+            const rows = document.createElement('div');
+            rows.className = 'chart-value-rows';
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+                if (!chart.isDatasetVisible(datasetIndex)) return;
+                const row = document.createElement('div');
+                row.className = 'chart-value-row';
+                const swatch = document.createElement('span');
+                swatch.className = 'chart-value-swatch';
+                swatch.style.background = dataset.borderColor || dataset.backgroundColor;
+                const name = document.createElement('span');
+                name.className = 'chart-value-name';
+                name.textContent = dataset.label;
+                const number = document.createElement('span');
+                number.className = 'chart-value-number';
+                const value = (dataset._raw || dataset.data)[index];
+                number.textContent = kind === 'counts' ? (value === null ? 'n/a' : new Intl.NumberFormat('en-US').format(value)) : formatMetric(value);
+                row.append(swatch, name, number);
+                rows.append(row);
+            });
+            chartValues.replaceChildren(heading, close, rows);
+            chartValues.hidden = false;
+            const box = chart.canvas.getBoundingClientRect();
+            const left = box.left + tooltip.caretX + 12;
+            const top = box.top + tooltip.caretY + 12;
+            chartValues.style.left = Math.max(12, Math.min(left, innerWidth - chartValues.offsetWidth - 12)) + 'px';
+            chartValues.style.top = Math.max(12, Math.min(top, innerHeight - chartValues.offsetHeight - 12)) + 'px';
+        };
+    }
+    document.addEventListener('click', event => {
+        if (event.target.matches('canvas')) {
+            requestAnimationFrame(() => {
+                if (event.target !== valueChart?.canvas || chartValues.hidden) return;
+                chartValuesPinned = true;
+                chartValues.classList.add('pinned');
+                chartValues.querySelector('button').focus({ preventScroll: true });
+            });
+        } else if (!chartValues.contains(event.target)) hideChartValues();
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') hideChartValues(); });
+    window.addEventListener('resize', hideChartValues);
+    window.addEventListener('scroll', event => { if (!chartValues.contains(event.target)) hideChartValues(); }, true);
+    records.forEach(record => {
+        if (records.filter(other => other.name === record.name).length > 1) record.displaySuffix = ` · Record ${record.index}`;
+    });
+    records.forEach(record => { record.name += record.displaySuffix || ''; });
+
+    // ------------------------------------------------------------------
+    // Single-app profile
+    // ------------------------------------------------------------------
+    const singleCanvas = document.getElementById('single-profile-chart');
+    if (singleCanvas && records.length === 1) {
+        const r = records[0];
+        const positiveValues = r.metricsRaw.filter(value => value !== null && value > 0);
+        const logMin = positiveValues.length ? Math.pow(10, Math.floor(Math.log10(Math.min(...positiveValues))) - 1) : 0.001;
+        const logMax = positiveValues.length ? Math.pow(10, Math.ceil(Math.log10(Math.max(...positiveValues)))) : 1;
+        const singleMetricLabels = {
+            id: 'singleMetricLabels',
+            beforeLayout(chart) {
+                chart.options.layout.padding.left = chart.width < 450 ? 170 : 215;
+            },
+            afterLayout(chart) {
+                document.querySelectorAll('#single-metric-labels [data-axis]').forEach(label => {
+                    label.style.width = (chart.chartArea.left - 10) + 'px';
+                    label.style.top = chart.scales.y.getPixelForValue(Number(label.dataset.axis)) + 'px';
+                });
+                document.querySelectorAll('#single-metric-labels [data-value]').forEach(label => {
+                    const index = Number(label.dataset.value);
+                    const value = r.metricsRaw[index];
+                    label.textContent = value === null ? 'n/a' : value <= 0 ? formatMetric(value) + ' (not plotted)' : formatMetric(value);
+                    label.style.left = (chart.scales.x.getPixelForValue(value > 0 ? value : logMin) + 8) + 'px';
+                    label.style.top = chart.scales.y.getPixelForValue(index) + 'px';
+                });
+            }
+        };
+        new Chart(singleCanvas, {
+            type: 'bar',
+            plugins: [singleMetricLabels],
+            data: {
+                labels: metricNames,
+                datasets: [{
+                    label: r.name,
+                    _raw: r.metricsRaw,
+                    data: r.metricsRaw.map(value => value > 0 ? value : null),
+                    backgroundColor: '#6366f1cc',
+                    borderRadius: 5,
+                    datalabels: { display: false }
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                layout: { padding: { left: 215, right: 65 } },
+                plugins: {
+                    legend: { display: false },
+                    datalabels: { display: false },
+                    tooltip: { enabled: false, mode: 'nearest', intersect: true, external: chartTooltip('metrics') }
+                },
+                scales: {
+                    x: { type: 'logarithmic', min: logMin, max: logMax, grid: { color: '#f1f5f9' }, ticks: { maxTicksLimit: 5 } },
+                    y: { display: false }
+                }
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Multi-app charts
+    // ------------------------------------------------------------------
+    if (records.length > 1) {
+        const comparisonLimit = 6;
+        records.forEach((record, index) => {
+            record.active = index < comparisonLimit;
+            record.color = colors[index % colors.length];
+        });
+        const selectionStatus = document.getElementById('comparison-selection-status');
+        const inputGroupDefinitions = {{ count_groups | tojson }};
+        let activeInputGroup = inputGroupDefinitions[0].id;
+        const inputGroups = inputGroupDefinitions.flatMap(group => group.sections.map(section => ({
+            ...section,
+            tabId: group.id,
+            indices: section.keys.map(key => records[0].countKeys.indexOf(key)),
+            container: document.getElementById('input-container-' + section.id),
+            chart: null
+        })));
+        const inputTabs = Array.from(document.querySelectorAll('[data-input-group]'));
+        function selectInputGroup(id) {
+            hideChartValues();
+            activeInputGroup = id;
+            inputTabs.forEach(tab => {
+                const selected = tab.dataset.inputGroup === id;
+                tab.setAttribute('aria-selected', String(selected));
+                tab.tabIndex = selected ? 0 : -1;
+                document.getElementById(tab.getAttribute('aria-controls')).hidden = !selected;
+            });
+            updateInputCharts();
+        }
+        inputTabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => selectInputGroup(tab.dataset.inputGroup));
+            tab.addEventListener('keydown', event => {
+                let next;
+                if (event.key === 'ArrowRight') next = (index + 1) % inputTabs.length;
+                else if (event.key === 'ArrowLeft') next = (index + inputTabs.length - 1) % inputTabs.length;
+                else if (event.key === 'Home') next = 0;
+                else if (event.key === 'End') next = inputTabs.length - 1;
+                else return;
+                event.preventDefault();
+                selectInputGroup(inputTabs[next].dataset.inputGroup);
+                inputTabs[next].focus();
+            });
+        });
+        const inputScrollObserver = new ResizeObserver(entries => {
+            entries.forEach(({ target }) => {
+                target.tabIndex = target.scrollWidth > target.clientWidth + 1 ? 0 : -1;
+            });
+        });
+        inputGroups.forEach(group => inputScrollObserver.observe(group.container.parentElement));
+        const toggleContainer = document.getElementById('chart-toggles');
+        if (toggleContainer) {
+            records.forEach((r, i) => {
+                const btn = document.createElement('button');
+                let color = r.color;
+                btn.className = 'dataset-toggle px-3 py-2 rounded-lg text-xs font-medium border bg-white';
+                btn.type = 'button';
+                btn.style.borderColor = r.active ? color : '';
+                btn.style.color = r.active ? color : '';
+                btn.innerText = r.name;
+                btn.classList.toggle('disabled', !r.active);
+                btn.setAttribute('aria-pressed', String(r.active));
+                btn.addEventListener('click', () => {
+                    if (!r.active && records.filter(record => record.active).length >= comparisonLimit) {
+                        selectionStatus.textContent = 'Six applications are already selected. Hide one before adding another.';
+                        return;
+                    }
+                    r.active = !r.active;
+                    if (r.active) {
+                        const usedColors = records.filter(record => record !== r && record.active).map(record => record.color);
+                        if (usedColors.includes(color)) color = colors.find(candidate => !usedColors.includes(candidate));
+                        r.color = color;
+                    }
+                    btn.setAttribute('aria-pressed', String(r.active));
+                    btn.classList.toggle('disabled', !r.active);
+                    if (r.active) {
+                        btn.style.borderColor = color;
+                        btn.style.color = color;
+                    } else {
+                        btn.style.borderColor = '';
+                        btn.style.color = '';
+                    }
+                    updateCharts();
+                });
+                toggleContainer.appendChild(btn);
+            });
+        }
+
+        const radarMetricLabels = {
+            id: 'radarMetricLabels',
+            afterLayout(chart) {
+                document.querySelectorAll('#radar-metric-labels [data-axis]').forEach(label => {
+                    const box = chart.scales.r.getPointLabelPosition(Number(label.dataset.axis));
+                    label.style.left = ((box.left + box.right) / 2) + 'px';
+                    label.style.top = ((box.top + box.bottom) / 2) + 'px';
+                });
+            }
+        };
+        let radarChart = null;
+        const countFormatter = new Intl.NumberFormat('en-US');
+        const countValueLabels = {
+            id: 'countValueLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx, scales: { x } } = chart;
+                ctx.save();
+                if (chart.data.datasets.length) {
+                    chart.data.labels.forEach((label, row) => {
+                        const bars = chart.data.datasets.map((_, index) => chart.getDatasetMeta(index).data[row]);
+                        const top = Math.min(...bars.map(bar => bar.y - bar.height / 2));
+                        const headingBaseline = top - 14;
+                        if (row > 0) {
+                            ctx.strokeStyle = '#f1f5f9';
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.moveTo(chart.chartArea.left, headingBaseline - 20);
+                            ctx.lineTo(chart.width - 24, headingBaseline - 20);
+                            ctx.stroke();
+                        }
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'alphabetic';
+                        ctx.fillStyle = '#475569';
+                        ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+                        ctx.fillText(label, chart.chartArea.left, headingBaseline);
+                        const symbolLeft = chart.chartArea.left + ctx.measureText(label).width + 10;
+                        ctx.fillStyle = '#64748b';
+                        ctx.font = '11px ui-monospace, monospace';
+                        ctx.fillText(chart.data.datasets[0]._symbols[row], symbolLeft, headingBaseline);
+                    });
+                }
+                ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+                ctx.fillStyle = '#475569';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                chart.data.datasets.forEach((dataset, index) => {
+                    chart.getDatasetMeta(index).data.forEach((bar, row) => {
+                        const value = dataset._raw[row];
+                        ctx.fillText(value === null ? 'n/a' : countFormatter.format(value), x.getPixelForValue(value > 0 ? value : x.min) + 7, bar.y);
+                    });
+                });
+                ctx.restore();
+            }
+        };
+
+        function updateCharts() {
+            hideChartValues();
+            const activeRecords = records.filter(r => r.active);
+            document.getElementById("radar-empty").hidden = activeRecords.length > 0;
+            document.getElementById("inputs-empty").hidden = activeRecords.length > 0;
+            document.getElementById("input-charts-grid").hidden = activeRecords.length === 0;
+            document.getElementById("radar-metric-labels").hidden = activeRecords.length === 0;
+            const inputLegend = document.getElementById('comparison-input-legend');
+            inputLegend.replaceChildren();
+            activeRecords.forEach(record => {
+                const label = document.createElement('span');
+                label.style.overflowWrap = 'anywhere';
+                const swatch = document.createElement('span');
+                swatch.textContent = '● ';
+                swatch.style.color = record.color;
+                swatch.setAttribute('aria-hidden', 'true');
+                label.append(swatch, document.createTextNode(record.name));
+                inputLegend.appendChild(label);
+            });
+            if (!activeRecords.length) inputLegend.textContent = 'No applications selected. Use Show above to select an application.';
+            if (selectionStatus) {
+                selectionStatus.textContent = `${activeRecords.length} of ${records.length} applications shown. Compare up to ${comparisonLimit} at once; hide one to select another. All applications remain in the report below.`;
+            }
+            const radarDatasets = activeRecords.map(r => {
+                const color = r.color;
+                return {
+                    label: r.name,
+                    data: r.metricsNormalized,
+                    _raw: r.metricsRaw,
+                    backgroundColor: color + '26',
+                    borderColor: color,
+                    borderWidth: 2,
+                    pointBackgroundColor: color,
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    fill: true
+                };
+            });
+
+            if (radarChart) {
+                radarChart.data.datasets = radarDatasets;
+                radarChart.update();
+            } else {
+                const radarCanvas = document.getElementById('global-radar-chart');
+                if (radarCanvas) {
+                    radarChart = new Chart(radarCanvas, {
+                        type: 'radar',
+                        plugins: [radarMetricLabels],
+                        data: { labels: metricOrder, datasets: radarDatasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                r: {
+                                    beginAtZero: true,
+                                    max: 1,
+                                    ticks: { display: false },
+                                    pointLabels: { callback: label => label + '   ⓘ', font: { size: 12, weight: '600' }, color: 'transparent', padding: 12 },
+                                    grid: { color: '#e2e8f0' },
+                                    angleLines: { color: '#e2e8f0' }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                datalabels: { display: false },
+                                tooltip: { enabled: false, mode: 'nearest', intersect: true, external: chartTooltip('metrics') }
+                            }
+                        }
+                    });
+                }
+            }
+
+            updateInputCharts(activeRecords);
+        }
+
+        function updateInputCharts(activeRecords = records.filter(record => record.active)) {
+            const countBarHeight = Math.max(14, activeRecords.length * 14);
+            const countRowHeight = countBarHeight + 48;
+            const maxCount = activeRecords.reduce((max, record) => Math.max(max, ...record.counts), 1);
+            const countAxisMax = 10 ** Math.max(0, Math.ceil(Math.log10(maxCount)));
+
+            inputGroups.forEach(group => {
+                if (group.tabId !== activeInputGroup || !activeRecords.length) return;
+                group.container.style.height = `${group.indices.length * countRowHeight + 62}px`;
+                const barDatasets = activeRecords.map(r => {
+                    const color = r.color;
+                    return {
+                        label: r.name,
+                        data: group.indices.map(index => r.counts[index] > 0 ? r.counts[index] : null),
+                        _raw: group.indices.map(index => r.counts[index]),
+                        _symbols: group.indices.map(index => r.countSymbols[index]),
+                        backgroundColor: color + 'cc',
+                        hoverBackgroundColor: color,
+                        borderRadius: 3,
+                        borderSkipped: false,
+                        categoryPercentage: countBarHeight / countRowHeight,
+                        barPercentage: 0.82,
+                        maxBarThickness: 11
+                    };
+                });
+
+                if (group.chart) {
+                    group.chart.data.datasets = barDatasets;
+                    group.chart.options.scales.x.max = countAxisMax;
+                    group.chart.resize();
+                    group.chart.update();
+                } else {
+                    const barCanvas = document.getElementById('input-chart-' + group.id);
+                    if (barCanvas) {
+                        group.chart = new Chart(barCanvas, {
+                            type: 'bar',
+                            plugins: [countValueLabels],
+                            data: { labels: group.indices.map(index => records[0].countLabels[index]), datasets: barDatasets },
+                            options: {
+                                indexAxis: 'y',
+                                animation: false,
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                layout: { padding: { top: 16, right: 65, bottom: 8, left: 12 } },
+                                plugins: {
+                                    legend: { display: false },
+                                    datalabels: { display: false },
+                                    tooltip: { enabled: false, mode: 'index', axis: 'y', intersect: false, external: chartTooltip('counts') }
+                                },
+                                scales: {
+                                    x: {
+                                        type: 'logarithmic',
+                                        min: 0.1,
+                                        max: countAxisMax,
+                                        afterBuildTicks: scale => {
+                                            scale.ticks = [];
+                                            for (let power = -1; power <= Math.round(Math.log10(scale.max)); power++) {
+                                                scale.ticks.push({ value: 10 ** power, major: true });
+                                            }
+                                        },
+                                        ticks: { callback: value => value < 1 ? String(value) : formatCompact(value), maxRotation: 0, maxTicksLimit: 5 },
+                                        title: { display: true, text: 'Count' },
+                                        grid: { drawOnChartArea: false, color: '#e2e8f0' },
+                                        border: { color: '#e2e8f0' }
+                                    },
+                                    y: { display: false }
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        updateCharts();
+    }
+
+    // ------------------------------------------------------------------
+
+});
+</script>
+
+<!-- JSON export -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const rawRecords = {{ raw_records | tojson }};
+    document.querySelectorAll('.export-json').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const index = parseInt(btn.getAttribute('data-index'), 10);
+            const payload = rawRecords.find((_, i) => (i + 1) === index) || rawRecords[index - 1];
+            if (!payload) return;
+
+            const rawName = payload.apk_name || payload.apk_path || ('mosaic-report-' + index);
+            const base = String(rawName).split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/\.apk$/i, '');
+            const filename = base + '.json';
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+    });
+});
+</script>
+
+</body>
+</html>
