@@ -67,7 +67,9 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}
+          tags: |
+            ${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}
+            ${{ steps.release.outputs.image }}:latest
           labels: |
             org.opencontainers.image.title=MOSAIC
             org.opencontainers.image.description=Android structural quality metrics from APKs
@@ -105,6 +107,8 @@ jobs:
               `docker pull ${IMAGE}:${VERSION}`,
               `docker run --rm ${IMAGE}:${VERSION} --help`,
               '```',
+              '',
+              `The rolling tag \`${IMAGE}:latest\` is updated on each successful release build. Use the versioned tag above or the immutable digest below to reproduce this release.`,
               '',
               `Immutable image reference: \`${IMAGE}@${DIGEST}\`.`,
               endMarker,

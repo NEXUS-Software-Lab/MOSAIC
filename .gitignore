@@ -224,3 +224,5 @@ __marimo__/
 *html
 !src/mosaic/data/*.html
 !src/mosaic/templates/*.html
+!docs/examples/*.json
+!docs/examples/*.html
