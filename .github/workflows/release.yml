@@ -1,0 +1,140 @@
+name: Publish release and Docker image
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out release
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Validate release version and choose image name
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          IMAGE_OWNER: ${{ github.repository_owner }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
+              raise SystemExit("Use a stable release tag such as v0.4.0.")
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          if tag != f"v{version}":
+              raise SystemExit(f"Tag {tag} does not match package version {version}.")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"image=ghcr.io/{os.environ['IMAGE_OWNER'].lower()}/mosaic\n")
+              output.write(f"version={version}\n")
+          PY
+
+      - name: Set up ARM emulation
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}
+          labels: |
+            org.opencontainers.image.title=MOSAIC
+            org.opencontainers.image.description=Android structural quality metrics from APKs
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create GitHub release with image link
+        uses: actions/github-script@v8
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          VERSION: ${{ steps.release.outputs.version }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        with:
+          script: |
+            const { IMAGE, VERSION, DIGEST, RELEASE_TAG } = process.env;
+            const marker = '<!-- mosaic-container -->';
+            const endMarker = '<!-- /mosaic-container -->';
+            const packageUrl = `${context.serverUrl}/orgs/${context.repo.owner}/packages/container/package/mosaic`;
+            const notes = [
+              marker,
+              '## Docker image',
+              '',
+              `[View the container package](${packageUrl})`,
+              '',
+              'Platforms: `linux/amd64`, `linux/arm64`.',
+              '',
+              'While the package is private, first authenticate with a GitHub personal access token (classic) with `read:packages` and access to the package. Public images can be pulled without login:',
+              '',
+              '```sh',
+              'docker login ghcr.io -u YOUR_GITHUB_USERNAME',
+              `docker pull ${IMAGE}:${VERSION}`,
+              `docker run --rm ${IMAGE}:${VERSION} --help`,
+              '```',
+              '',
+              `Immutable image reference: \`${IMAGE}@${DIGEST}\`.`,
+              endMarker,
+            ].join('\n');
+            let release;
+            try {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({
+                ...context.repo, tag: RELEASE_TAG,
+              }));
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            if (release) {
+              const body = release.body || '';
+              const start = body.indexOf(marker);
+              const end = body.indexOf(endMarker, start);
+              const updated = start >= 0 && end >= start
+                ? body.slice(0, start) + notes + body.slice(end + endMarker.length)
+                : body + '\n\n' + notes;
+              await github.rest.repos.updateRelease({
+                ...context.repo, release_id: release.id, body: updated,
+              });
+            } else {
+              await github.rest.repos.createRelease({
+                ...context.repo,
+                tag_name: RELEASE_TAG,
+                name: RELEASE_TAG,
+                body: notes,
+                draft: false,
+                prerelease: false,
+                generate_release_notes: true,
+              });
+            }

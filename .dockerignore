@@ -1,0 +1,14 @@
+# Only package inputs enter the build context. Local APKs, reports, credentials,
+# Git history, virtual environments, and build output are excluded by default.
+**
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!README.md
+!src/
+!src/mosaic/
+!src/mosaic/**
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
