@@ -1,6 +1,6 @@
 # MOSAIC
 
-**Metrics for Android Structural Characterization - Android structural metrics from APKs**
+**Metrics for Android Structural Characterization**
 
 [![NEXUS Software Lab](https://img.shields.io/badge/NEXUS-Software_Lab-243b53?style=flat-square)](https://nexus-software-lab.github.io/)
 [![GitHub organization](https://img.shields.io/badge/GitHub-NEXUS--Software--Lab-181717?logo=github&style=flat-square)](https://github.com/NEXUS-Software-Lab)
@@ -11,7 +11,7 @@
 
 MOSAIC analyzes Android application packages to characterize their structure, lifecycle responsibilities, inter-component communication, UI entanglement, and dependence on asynchronous constructs and platform APIs. It computes **seven Android-specific measures** and exports their values together with underlying counts, structural evidence, and analysis provenance.
 
-Use MOSAIC to inspect a single application or compare several APKs through an interactive HTML report. JSON exports support further analysis and reproducible research workflows. Analysis is static: application source code, an emulator, and a running Android device are not required.
+Use MOSAIC to inspect a single application or compare several APKs through an interactive HTML report. JSON exports support further analysis and reproducible research workflows. Application source code, an emulator, or a running Android device are not required.
 
 [Quickstart](#quickstart) · [Overview](#overview) · [Usage](#usage) · [Example-exports](#example-exports)
 
